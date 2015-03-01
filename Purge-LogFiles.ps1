@@ -42,6 +42,7 @@
     1.2     Auto/Manual configration options added
     1.3     Check if running in elevated mode added
     1.4     Handling of IIS default location fixed
+    1.5     Sorting of server names added and Write-Host output changed
 	
 	.PARAMETER DaysToKeep
     Number of days Exchange and IIS log files should be retained, default is 30 days
@@ -115,7 +116,7 @@ Function CleanLogFiles
                 $fileCount++
                 }
         
-        Write-Host "--> $fileCount files deleted in $TargetServerFolder" -ForegroundColor Red
+        Write-Host "--> $fileCount files deleted in $TargetServerFolder" -ForegroundColor Gray
     }
     Else {
         # oops, folder does not exist or is not accessible
@@ -146,7 +147,7 @@ If (Is-Admin) {
     Write-AdminAuditLog -Comment "Purge-LogFiles started!"
 
     # Get a list of all Exchange 2013 servers
-    $Ex2013 = Get-ExchangeServer | Where {$_.IsE15OrLater -eq $true}
+    $Ex2013 = Get-ExchangeServer | Where {$_.IsE15OrLater -eq $true} | Sort-Object Name
 
     # Lets count the steps for a nice progress bar
     $i = 1
@@ -154,8 +155,11 @@ If (Is-Admin) {
 
     # Call function for each server and each directory type
     foreach ($E15Server In $Ex2013) {
+        Write-Host "Working on: $E15Server" -ForegroundColor Gray
+
         CleanLogFiles -path $IisUncLogPath
         $i++
+
         CleanLogfiles -path $ExchangeUncLogPath
         $i++
     }
