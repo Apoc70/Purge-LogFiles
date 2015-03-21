@@ -9,7 +9,7 @@
 	THIS CODE IS MADE AVAILABLE AS IS, WITHOUT WARRANTY OF ANY KIND. THE ENTIRE 
 	RISK OF THE USE OR THE RESULTS FROM THE USE OF THIS CODE REMAINS WITH THE USER.
 	
-	Version 1.2, 2014-12-10
+	Version 1.6, 2015-03-21
 
     Ideas, comments and suggestions to support@granikos.eu 
  
@@ -43,6 +43,7 @@
     1.3     Check if running in elevated mode added
     1.4     Handling of IIS default location fixed
     1.5     Sorting of server names added and Write-Host output changed
+    1.6     Count Error fixed
 	
 	.PARAMETER DaysToKeep
     Number of days Exchange and IIS log files should be retained, default is 30 days
@@ -147,11 +148,14 @@ If (Is-Admin) {
     Write-AdminAuditLog -Comment "Purge-LogFiles started!"
 
     # Get a list of all Exchange 2013 servers
-    $Ex2013 = Get-ExchangeServer | Where {$_.IsE15OrLater -eq $true} | Sort-Object Name
+    $Ex2013 = @(Get-ExchangeServer | Where {$_.IsE15OrLater -eq $true} | Sort-Object Name)
+    Write-Output "Output"
+    $Ex2013
 
     # Lets count the steps for a nice progress bar
     $i = 1
-    $max = $Ex2013.Count * 2 # two actions to execute per server
+    
+    $max = ($Ex2013).Count * 2 # two actions to execute per server
 
     # Call function for each server and each directory type
     foreach ($E15Server In $Ex2013) {
