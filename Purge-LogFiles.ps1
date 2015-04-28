@@ -9,7 +9,7 @@
 	THIS CODE IS MADE AVAILABLE AS IS, WITHOUT WARRANTY OF ANY KIND. THE ENTIRE 
 	RISK OF THE USE OR THE RESULTS FROM THE USE OF THIS CODE REMAINS WITH THE USER.
 	
-	Version 1.6, 2015-03-21
+	Version 1.7, 2015-04-28
 
     Ideas, comments and suggestions to support@granikos.eu 
  
@@ -44,21 +44,46 @@
     1.4     Handling of IIS default location fixed
     1.5     Sorting of server names added and Write-Host output changed
     1.6     Count Error fixed
+	1.7		Email report functionality added
 	
 	.PARAMETER DaysToKeep
     Number of days Exchange and IIS log files should be retained, default is 30 days
 
     .PARAMETER Auto
     Switch to use automatic detection of the IIS and Exchange log folder paths
+	
+	.PARAMETER SendMail
+    Switch to send an Html report
+
+    .PARAMETER MailFrom
+    Email address of report sender
+
+    .PARAMETER MailTo
+    Email address of report recipient
+
+    .PARAMETER MailServer
+    SMTP Server for email report
    
 	.EXAMPLE
     Delete Exchange and IIS log files older than 14 days 
     .\Purge-LogFiles -DaysToKeep 14
-	
+
+    .EXAMPLE
+    Delete Exchange and IIS log files older than 7 days with automatic discovery
+    .\Purge-LogFiles -DaysToKeep 7 -Auto
+
+    .EXAMPLE
+    Delete Exchange and IIS log files older than 7 days with automatic discovery and send email report
+    .\Purge-LogFiles -DaysToKeep 7 -Auto -SendMail -MailFrom postmaster@sedna-inc.com -MailTo exchangeadmin@sedna-inc.com -MailServer mail.sedna-inc.com 
+
     #>
 Param(
     [parameter(Mandatory=$false,ValueFromPipeline=$false,HelpMessage='Number of days for log files retention')][int]$DaysToKeep = 30,  
-    [parameter(Mandatory=$false,ValueFromPipeline=$false,HelpMessage='Use automatic folder detection for Exchange and IIS log paths')][switch]$Auto  
+    [parameter(Mandatory=$false,ValueFromPipeline=$false,HelpMessage='Use automatic folder detection for Exchange and IIS log paths')][switch]$Auto,
+    [parameter(Mandatory=$false,ValueFromPipeline=$false,HelpMessage='Send result summary as email')][switch]$SendMail,
+    [parameter(Mandatory=$false,ValueFromPipeline=$false,HelpMessage='Sender address for result summary')][string]$MailFrom = "",
+    [parameter(Mandatory=$false,ValueFromPipeline=$false,HelpMessage='Recipient address for result summary')][string]$MailTo = "",
+    [parameter(Mandatory=$false,ValueFromPipeline=$false,HelpMessage='SMTP Server address for sending result summary')][string]$MailServer = ""  
 )
 
 Set-StrictMode -Version Latest
@@ -118,11 +143,17 @@ Function CleanLogFiles
                 }
         
         Write-Host "--> $fileCount files deleted in $TargetServerFolder" -ForegroundColor Gray
+		
+		$Output = "<li>$fileCount files deleted in '$TargetServerFolder'</li>"
     }
     Else {
         # oops, folder does not exist or is not accessible
         Write-Host "The folder $TargetServerFolder doesn't exist or is not accessible! Check the folder path!" -ForegroundColor "red"
+		
+		$Output = "The folder $TargetServerFolder doesn't exist or is not accessible! Check the folder path!"
     }
+	
+	$Output
 }
 
 # Check if we are running in elevated mode
@@ -137,7 +168,19 @@ Function Is-Admin {
     }
 }
 
+Function Check-SendMail {
+     if( ($SendMail) -and ($MailFrom -ne "") -and ($MailTo -ne "") -and ($MailServer -ne "") ) {
+        return $true
+     }
+     else {
+        return $false
+     }
+}
+
 # Main -----------------------------------------------------
+If (-Not (Check-SendMail)) {
+    Throw "If -SendMail specified, -MailFrom, -MailTo and -MailServer must be specified as well!"
+}
 
 If (Is-Admin) {
     # We are running in elevated mode. Let's continue.
@@ -157,18 +200,37 @@ If (Is-Admin) {
     
     $max = ($Ex2013).Count * 2 # two actions to execute per server
 
+	# Prepare Output
+    $Output = "<html>
+    <body>
+    <font size=""1"" face=""Arial,sans-serif"">"
+	
     # Call function for each server and each directory type
     foreach ($E15Server In $Ex2013) {
         Write-Host "Working on: $E15Server" -ForegroundColor Gray
 
-        CleanLogFiles -path $IisUncLogPath
+		$Output += "<h5>$E15Server</h5>
+        <ul>"
+		
+        $Output += CleanLogFiles -path $IisUncLogPath
         $i++
 
-        CleanLogfiles -path $ExchangeUncLogPath
+        $Output += CleanLogfiles -path $ExchangeUncLogPath
         $i++
+		
+		$Output+="</ul>"
+    }
+	
+	# Finalize Output
+    $Output+="</font>
+    </body>
+    </html>"
+	
+	if($SendMail) {
+        Send-MailMessage -From $MailFrom -To $MailTo -SmtpServer $MailServer -BodyAsHtml $Output -Subject "Purge-Logfiles Report"         
     }
 }
 else {
     # Ooops, the admin did it again.
-    Write-Output "The script need to be executed in elevated mode. Start the Exchange Management Shell as Administrator."
+    Write-Output "The script needs to be executed in elevated mode. Start the Exchange Management Shell as Administrator."
 }
