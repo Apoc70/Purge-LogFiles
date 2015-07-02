@@ -1,6 +1,6 @@
 <#
     .SYNOPSIS
-    Purge Exchange 2013 and IIS logfiles on all Exchange servers 
+    Purge Exchange 2013 and IIS logfiles across Exchange servers 
    
    	Thomas Stensitzki
     (Based Based on the original script by Brian Reid, C7 Solutions (c)
@@ -9,7 +9,7 @@
 	THIS CODE IS MADE AVAILABLE AS IS, WITHOUT WARRANTY OF ANY KIND. THE ENTIRE 
 	RISK OF THE USE OR THE RESULTS FROM THE USE OF THIS CODE REMAINS WITH THE USER.
 	
-	Version 1.8, 2015-06-19
+	Version 1.9, 2015-07-01
 
     Ideas, comments and suggestions to support@granikos.eu 
  
@@ -34,7 +34,6 @@
     .NOTES 
     Requirements 
     - Windows Server 2008 R2 SP1, Windows Server 2012 or Windows Server 2012 R2  
-	- GlobalFunctions Module, https://github.com/Apoc70/GlobalFunctions
 
     Revision History 
     -------------------------------------------------------------------------------- 
@@ -45,16 +44,17 @@
     1.4     Handling of IIS default location fixed
     1.5     Sorting of server names added and Write-Host output changed
     1.6     Count Error fixed
-	1.7		Email report functionality added
+    1.7		Email report functionality added
 	1.8     Support for global logging and other functions added
+    1.9     Global functions updated (write to event log)
 	
 	.PARAMETER DaysToKeep
     Number of days Exchange and IIS log files should be retained, default is 30 days
 
     .PARAMETER Auto
     Switch to use automatic detection of the IIS and Exchange log folder paths
-	
-	.PARAMETER SendMail
+
+    .PARAMETER SendMail
     Switch to send an Html report
 
     .PARAMETER MailFrom
@@ -85,7 +85,7 @@ Param(
     [parameter(Mandatory=$false,ValueFromPipeline=$false,HelpMessage='Send result summary as email')][switch]$SendMail,
     [parameter(Mandatory=$false,ValueFromPipeline=$false,HelpMessage='Sender address for result summary')][string]$MailFrom = "",
     [parameter(Mandatory=$false,ValueFromPipeline=$false,HelpMessage='Recipient address for result summary')][string]$MailTo = "",
-    [parameter(Mandatory=$false,ValueFromPipeline=$false,HelpMessage='SMTP Server address for sending result summary')][string]$MailServer = ""  
+    [parameter(Mandatory=$false,ValueFromPipeline=$false,HelpMessage='SMTP Server address for sending result summary')][string]$MailServer = ""
 )
 
 Set-StrictMode -Version Latest
@@ -95,14 +95,14 @@ Set-StrictMode -Version Latest
 ##   "C$\inetpub\logs\LogFiles"
 ##   "C$\Program Files\Microsoft\Exchange Server\V15\Logging"
 
-[string]$IisUncLogPath = "C$\inetpub\logs\LogFiles"
-[string]$ExchangeUncLogPath = "C$\Program Files\Microsoft\Exchange Server\V15\Logging"
+[string]$IisUncLogPath = "D$\IISLogs"
+[string]$ExchangeUncLogPath = "E$\Program Files\Microsoft\Exchange Server\V15\Logging"
 
 # 2016-06-18: Implementationof global module
-# Requires GlobalFunctions (https://github.com/Apoc70/GlobalFunctions)
-Import-Module GlobalFunctions
+Import-Module BDRFunctions
 $ScriptDir = Split-Path $script:MyInvocation.MyCommand.Path
-$logger = New-Logger -ScriptRoot $ScriptDir -LogFileRetention 14
+$ScriptName = $MyInvocation.MyCommand.Name
+$logger = New-Logger -ScriptRoot $ScriptDir -ScriptName $ScriptName -LogFileRetention 14
 $logger.Write("Script started")
 
 if($Auto) {
@@ -124,7 +124,7 @@ if($Auto) {
 # Function to clean log files from remote servers using UNC paths
 Function CleanLogFiles   
 {
-    Param([string]$path)
+    Param([string]$Path)
 
     # Build full UNC path
     $TargetServerFolder = "\\" + $E15Server + "\" + $path
@@ -147,10 +147,10 @@ Function CleanLogFiles
         # Delete the files
         foreach ($File in $Files)
             {
-                Remove-Item $File -ErrorAction SilentlyContinue | out-null
+                Remove-Item $File -ErrorAction SilentlyContinue -Force | out-null
                 $fileCount++
                 }
-        
+
         #Write-Host "--> $fileCount files deleted in $TargetServerFolder" -ForegroundColor Gray
 
         $logger.Write("$($fileCount) files deleted in $($TargetServerFolder)")
@@ -160,9 +160,11 @@ Function CleanLogFiles
     Else {
         # oops, folder does not exist or is not accessible
         Write-Host "The folder $TargetServerFolder doesn't exist or is not accessible! Check the folder path!" -ForegroundColor "red"
-		$Output = "The folder $TargetServerFolder doesn't exist or is not accessible! Check the folder path!"
+
+        $Output = "The folder $TargetServerFolder doesn't exist or is not accessible! Check the folder path!"
     }
-	$Output
+
+    $Output
 }
 
 # Check if we are running in elevated mode
@@ -198,51 +200,52 @@ If (Is-Admin) {
 
     # Track script execution in Exchange Admin Audit Log 
     Write-AdminAuditLog -Comment "Purge-LogFiles started!"
-	$logger.Write("Purge-LogFiles started")
+    $logger.Write("Purge-LogFiles started")
 
     # Get a list of all Exchange 2013 servers
-    $Ex2013 = @(Get-ExchangeServer | Where {$_.IsE15OrLater -eq $true} | Sort-Object Name)
-    Write-Output "Output"
-    $Ex2013
+    $Ex2013 = Get-ExchangeServer | Where {$_.IsE15OrLater -eq $true} | Sort-Object Name
+
+    $logger.WriteEventLog("Script started. Script will purge log files on: $($Ex2013)")
 
     # Lets count the steps for a nice progress bar
-    $i = 1    
-    $max = ($Ex2013).Count * 2 # two actions to execute per server
+    $i = 1
+    $max = $Ex2013.Count * 2 # two actions to execute per server
 
-	# Prepare Output
+    # Prepare Output
     $Output = "<html>
     <body>
     <font size=""1"" face=""Arial,sans-serif"">"
-	
+
     # Call function for each server and each directory type
     foreach ($E15Server In $Ex2013) {
-        Write-Host "Working on: $E15Server" -ForegroundColor Gray
+        # Write-Host "Working on: $E15Server" -ForegroundColor Gray
 
-		$Output += "<h5>$E15Server</h5>
+        $Output += "<h5>$E15Server</h5>
         <ul>"
-		
-        $Output += CleanLogFiles -path $IisUncLogPath
+
+        $Output += CleanLogFiles -Path $IisUncLogPath
         $i++
 
-        $Output += CleanLogfiles -path $ExchangeUncLogPath
+        $Output += CleanLogfiles -Path $ExchangeUncLogPath
         $i++
-		
-		$Output+="</ul>"
+
+        $Output+="</ul>"
+
     }
-	
-	# Finalize Output
+
+    # Finalize Output
     $Output+="</font>
     </body>
     </html>"
-	
-	if($SendMail) {
+
+    if($SendMail) {
         $logger.Write("Sending email to $($MailTo)")
         Send-Mail -From $MailFrom -To $MailTo -SmtpServer $MailServer -MessageBody $Output -Subject "Purge-Logfiles Report"         
     }
-	
-	$logger.Write("Script finished")
+
+    $logger.Write("Script finished")
 }
 else {
     # Ooops, the admin did it again.
-    Write-Output "The script needs to be executed in elevated mode. Start the Exchange Management Shell as Administrator."
+    Write-Output "The script need to be executed in elevated mode. Start the Exchange Management Shell as Administrator."
 }
