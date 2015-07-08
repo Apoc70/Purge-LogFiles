@@ -98,7 +98,7 @@ Set-StrictMode -Version Latest
 [string]$IisUncLogPath = "D$\IISLogs"
 [string]$ExchangeUncLogPath = "E$\Program Files\Microsoft\Exchange Server\V15\Logging"
 
-# 2016-06-18: Implementationof global module
+# 2015-06-18: Implementationof global module
 Import-Module GlobalFunctions
 $ScriptDir = Split-Path $script:MyInvocation.MyCommand.Path
 $ScriptName = $MyInvocation.MyCommand.Name
