@@ -99,7 +99,7 @@ Set-StrictMode -Version Latest
 [string]$ExchangeUncLogPath = "E$\Program Files\Microsoft\Exchange Server\V15\Logging"
 
 # 2016-06-18: Implementationof global module
-Import-Module BDRFunctions
+Import-Module GlobalFunctions
 $ScriptDir = Split-Path $script:MyInvocation.MyCommand.Path
 $ScriptName = $MyInvocation.MyCommand.Name
 $logger = New-Logger -ScriptRoot $ScriptDir -ScriptName $ScriptName -LogFileRetention 14
