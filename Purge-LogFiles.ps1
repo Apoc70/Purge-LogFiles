@@ -34,6 +34,7 @@
     .NOTES 
     Requirements 
     - Windows Server 2008 R2 SP1, Windows Server 2012 or Windows Server 2012 R2  
+    - Utilites global function library, 
 
     Revision History 
     -------------------------------------------------------------------------------- 
@@ -47,6 +48,7 @@
     1.7		Email report functionality added
 	1.8     Support for global logging and other functions added
     1.9     Global functions updated (write to event log)
+    1.91    Write DaysToKeep to log
 	
 	.PARAMETER DaysToKeep
     Number of days Exchange and IIS log files should be retained, default is 30 days
@@ -80,12 +82,18 @@
 
     #>
 Param(
-    [parameter(Mandatory=$false,ValueFromPipeline=$false,HelpMessage='Number of days for log files retention')][int]$DaysToKeep = 30,  
-    [parameter(Mandatory=$false,ValueFromPipeline=$false,HelpMessage='Use automatic folder detection for Exchange and IIS log paths')][switch]$Auto,
-    [parameter(Mandatory=$false,ValueFromPipeline=$false,HelpMessage='Send result summary as email')][switch]$SendMail,
-    [parameter(Mandatory=$false,ValueFromPipeline=$false,HelpMessage='Sender address for result summary')][string]$MailFrom = "",
-    [parameter(Mandatory=$false,ValueFromPipeline=$false,HelpMessage='Recipient address for result summary')][string]$MailTo = "",
-    [parameter(Mandatory=$false,ValueFromPipeline=$false,HelpMessage='SMTP Server address for sending result summary')][string]$MailServer = ""
+    [parameter(Mandatory=$false,ValueFromPipeline=$false,HelpMessage='Number of days for log files retention')]
+        [int]$DaysToKeep = 30,  
+    [parameter(Mandatory=$false,ValueFromPipeline=$false,HelpMessage='Use automatic folder detection for Exchange and IIS log paths')]
+        [switch]$Auto,
+    [parameter(Mandatory=$false,ValueFromPipeline=$false,HelpMessage='Send result summary as email')]
+        [switch]$SendMail,
+    [parameter(Mandatory=$false,ValueFromPipeline=$false,HelpMessage='Sender address for result summary')]
+        [string]$MailFrom = "",
+    [parameter(Mandatory=$false,ValueFromPipeline=$false,HelpMessage='Recipient address for result summary')]
+        [string]$MailTo = "",
+    [parameter(Mandatory=$false,ValueFromPipeline=$false,HelpMessage='SMTP Server address for sending result summary')]
+        [string]$MailServer = ""
 )
 
 Set-StrictMode -Version Latest
@@ -200,7 +208,7 @@ If (Is-Admin) {
 
     # Track script execution in Exchange Admin Audit Log 
     Write-AdminAuditLog -Comment "Purge-LogFiles started!"
-    $logger.Write("Purge-LogFiles started")
+    $logger.Write("Purge-LogFiles started, keeping last $($DaysToKeep) days of log files.")
 
     # Get a list of all Exchange 2013 servers
     $Ex2013 = Get-ExchangeServer | Where {$_.IsE15OrLater -eq $true} | Sort-Object Name
