@@ -217,7 +217,7 @@ If (Is-Admin) {
 
     # Lets count the steps for a nice progress bar
     $i = 1
-    $max = $Ex2013.Count * 2 # two actions to execute per server
+    $max = ($Ex2013 | Measure-Object).Count * 2 # two actions to execute per server
 
     # Prepare Output
     $Output = "<html>
