@@ -9,7 +9,7 @@
 	THIS CODE IS MADE AVAILABLE AS IS, WITHOUT WARRANTY OF ANY KIND. THE ENTIRE 
 	RISK OF THE USE OR THE RESULTS FROM THE USE OF THIS CODE REMAINS WITH THE USER.
 	
-	Version 1.9, 2015-07-01
+	Version 1.92, 2015-08-26
 
     Ideas, comments and suggestions to support@granikos.eu 
  
@@ -49,6 +49,7 @@
 	1.8     Support for global logging and other functions added
     1.9     Global functions updated (write to event log)
     1.91    Write DaysToKeep to log
+    1.92    .Count issue fixed to run on Windows Server 2012
 	
 	.PARAMETER DaysToKeep
     Number of days Exchange and IIS log files should be retained, default is 30 days
