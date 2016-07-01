@@ -190,7 +190,7 @@ Function Get-IsAdmin {
 }
 
 Function Get-CheckSendMail {
-     if( ($SendMail) -and ($MailFrom -ne '') -and ($MailTo -ne '') -and ($MailServer -ne '') ) {
+     if (-Not ($SendMail) -or ( ($SendMail) -and ($MailFrom -ne '') -and ($MailTo -ne '') -and ($MailServer -ne '') ) ) {
         return $true
      }
      else {
