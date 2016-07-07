@@ -9,7 +9,7 @@
 	  THIS CODE IS MADE AVAILABLE AS IS, WITHOUT WARRANTY OF ANY KIND. THE ENTIRE 
 	  RISK OF THE USE OR THE RESULTS FROM THE USE OF THIS CODE REMAINS WITH THE USER.
 	
-	  Version 1.93, 2016-06-05
+	  Version 1.94, 2016-07-07
 
     Ideas, comments and suggestions to support@granikos.eu 
  
@@ -51,6 +51,7 @@
     1.91    Write DaysToKeep to log
     1.92    .Count issue fixed to run on Windows Server 2012
     1.93    Minor chances to PowerShell hygiene
+    1.94    SendMail issue fixed (Thanks to denisvm, https://github.com/denisvm)
 	
 	  .PARAMETER DaysToKeep
     Number of days Exchange and IIS log files should be retained, default is 30 days
