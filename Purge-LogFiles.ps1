@@ -122,7 +122,7 @@ if($Auto) {
     [string]$ExchangeInstallPath = $env:ExchangeInstallPath
     [string]$ExchangeUncLogDrive = $ExchangeInstallPath.Split(':\')[0]
     $ExchangeUncLogPath = $ExchangeUncLogDrive + "$\" + $ExchangeInstallPath.Remove(0,3) + 'Logging\'
-
+    Join-Path -
     # Fetch local IIS log location from Metabase
     # IIS default location fixed 2015-02-02
     [string]$IisLogPath = ((Get-WebConfigurationProperty 'system.applicationHost/sites/siteDefaults' -Name logFile).directory).Replace('%SystemDrive%',$env:SystemDrive)
@@ -133,7 +133,7 @@ if($Auto) {
 }
 
 # Function to clean log files from remote servers using UNC paths
-Function CleanLogFiles   
+Function Remove-LogFiles   
 {
     Param([string]$Path)
 
@@ -143,7 +143,7 @@ Function CleanLogFiles
     # Write progress bar for current activity
     Write-Progress -Activity "Checking Server $E15Server" -Status "Checking files in $TargetServerFolder" -PercentComplete(($i/$max)*100)
 
-    # Only try to delete files, if folder exists
+    # Try to delete files only if folder exists
     if (Test-Path $TargetServerFolder) {
         
         $Now = Get-Date
@@ -234,10 +234,10 @@ If (Get-IsAdmin) {
         $Output += "<h5>$E15Server</h5>
         <ul>"
 
-        $Output += CleanLogFiles -Path $IisUncLogPath
+        $Output += Remove-LogFiles -Path $IisUncLogPath
         $i++
 
-        $Output += CleanLogfiles -Path $ExchangeUncLogPath
+        $Output += Remove-LogFiles -Path $ExchangeUncLogPath
         $i++
 
         $Output+='</ul>'
