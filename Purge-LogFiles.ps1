@@ -1,117 +1,113 @@
 <#
-    .SYNOPSIS
-    Purge Exchange 2013 and IIS logfiles across Exchange servers 
+  .SYNOPSIS
+  Purge Exchange 2013 and IIS logfiles across Exchange servers 
    
-   	Thomas Stensitzki
-    (Based Based on the original script by Brian Reid, C7 Solutions (c)
-    http://www.c7solutions.com/2013/04/removing-old-exchange-2013-log-files-html)
+  Thomas Stensitzki
+  (Based Based on the original script by Brian Reid, C7 Solutions (c)
+  http://www.c7solutions.com/2013/04/removing-old-exchange-2013-log-files-html)
 	
-	  THIS CODE IS MADE AVAILABLE AS IS, WITHOUT WARRANTY OF ANY KIND. THE ENTIRE 
-	  RISK OF THE USE OR THE RESULTS FROM THE USE OF THIS CODE REMAINS WITH THE USER.
+  THIS CODE IS MADE AVAILABLE AS IS, WITHOUT WARRANTY OF ANY KIND. THE ENTIRE 
+  RISK OF THE USE OR THE RESULTS FROM THE USE OF THIS CODE REMAINS WITH THE USER.
 	
-	  Version 1.94, 2016-07-07
+  Version 1.94, 2016-07-07
 
-    Ideas, comments and suggestions to support@granikos.eu 
+  Ideas, comments and suggestions to support@granikos.eu 
  
-    .LINK  
-    More information can be found at http://www.granikos.eu/en/scripts 
+  .LINK  
+  More information can be found at http://scripts.granikos.eu 
 	
-    .DESCRIPTION
+  .DESCRIPTION
 	
-    This script deletes all Exchange and IIS logs older than X days from all Exchange 2013 servers
-    that are fetched using the Get-ExchangeServer cmdlet.
+  This script deletes all Exchange and IIS logs older than X days from all Exchange 2013 servers
+  that are fetched using the Get-ExchangeServer cmdlet.
 
-    The Exchange log file location is read from the environment variable and used to build an 
-    adminstrative UNC path for file deletions.
+  The Exchange log file location is read from the environment variable and used to build an 
+  adminstrative UNC path for file deletions.
 
-    It is assumed that the Exchange setup path is IDENTICAL across all Exchange servers.
+  It is assumed that the Exchange setup path is IDENTICAL across all Exchange servers.
 
-    The IIS log file location is read from the local IIS metabase of the LOCAL server
-    and is used to build an administrative UNC path for IIS log file deletions.
+  The IIS log file location is read from the local IIS metabase of the LOCAL server
+  and is used to build an administrative UNC path for IIS log file deletions.
 
-    It is assumed that the IIS log file location is identical across all Exchange servers.
+  It is assumed that the IIS log file location is identical across all Exchange servers.
 
-    .NOTES 
-    Requirements 
-    - Windows Server 2008 R2 SP1, Windows Server 2012 or Windows Server 2012 R2  
-    - Utilites global function library, 
+  .NOTES 
+  Requirements 
+  - Windows Server 2008 R2 SP1, Windows Server 2012 or Windows Server 2012 R2  
+  - Utilites global function library found here: 
+  - Exchange 2013+ Management Shell
 
-    Revision History 
-    -------------------------------------------------------------------------------- 
-    1.0     Initial community release 
-    1.1     Variable fix and optional code added 
-    1.2     Auto/Manual configration options added
-    1.3     Check if running in elevated mode added
-    1.4     Handling of IIS default location fixed
-    1.5     Sorting of server names added and Write-Host output changed
-    1.6     Count Error fixed
-    1.7		  Email report functionality added
-	  1.8     Support for global logging and other functions added
-    1.9     Global functions updated (write to event log)
-    1.91    Write DaysToKeep to log
-    1.92    .Count issue fixed to run on Windows Server 2012
-    1.93    Minor chances to PowerShell hygiene
-    1.94    SendMail issue fixed (Thanks to denisvm, https://github.com/denisvm)
+  Revision History 
+  -------------------------------------------------------------------------------- 
+  1.0     Initial community release 
+  1.1     Variable fix and optional code added 
+  1.2     Auto/Manual configration options added
+  1.3     Check if running in elevated mode added
+  1.4     Handling of IIS default location fixed
+  1.5     Sorting of server names added and Write-Host output changed
+  1.6     Count Error fixed
+  1.7		  Email report functionality added
+  1.8     Support for global logging and other functions added
+  1.9     Global functions updated (write to event log)
+  1.91    Write DaysToKeep to log
+  1.92    .Count issue fixed to run on Windows Server 2012
+  1.93    Minor chances to PowerShell hygiene
+  1.94    SendMail issue fixed (Thanks to denisvm, https://github.com/denisvm)
+  2.0     Script update
 	
-	  .PARAMETER DaysToKeep
-    Number of days Exchange and IIS log files should be retained, default is 30 days
+  .PARAMETER DaysToKeep
+  Number of days Exchange and IIS log files should be retained, default is 30 days
 
-    .PARAMETER Auto
-    Switch to use automatic detection of the IIS and Exchange log folder paths
+  .PARAMETER Auto
+  Switch to use automatic detection of the IIS and Exchange log folder paths
 
-    .PARAMETER SendMail
-    Switch to send an Html report
+  .PARAMETER SendMail
+  Switch to send an Html report
 
-    .PARAMETER MailFrom
-    Email address of report sender
+  .PARAMETER MailFrom
+  Email address of report sender
 
-    .PARAMETER MailTo
-    Email address of report recipient
+  .PARAMETER MailTo
+  Email address of report recipient
 
-    .PARAMETER MailServer
-    SMTP Server for email report
+  .PARAMETER MailServer
+  SMTP Server for email report
    
-	  .EXAMPLE
-    Delete Exchange and IIS log files older than 14 days 
-    .\Purge-LogFiles -DaysToKeep 14
+  .EXAMPLE
+  Delete Exchange and IIS log files older than 14 days 
+  .\Purge-LogFiles -DaysToKeep 14
 
-    .EXAMPLE
-    Delete Exchange and IIS log files older than 7 days with automatic discovery
-    .\Purge-LogFiles -DaysToKeep 7 -Auto
+  .EXAMPLE
+  Delete Exchange and IIS log files older than 7 days with automatic discovery
+  .\Purge-LogFiles -DaysToKeep 7 -Auto
 
-    .EXAMPLE
-    Delete Exchange and IIS log files older than 7 days with automatic discovery and send email report
-    .\Purge-LogFiles -DaysToKeep 7 -Auto -SendMail -MailFrom postmaster@sedna-inc.com -MailTo exchangeadmin@sedna-inc.com -MailServer mail.sedna-inc.com 
+  .EXAMPLE
+  Delete Exchange and IIS log files older than 7 days with automatic discovery and send email report
+  .\Purge-LogFiles -DaysToKeep 7 -Auto -SendMail -MailFrom postmaster@sedna-inc.com -MailTo exchangeadmin@sedna-inc.com -MailServer mail.sedna-inc.com 
 
-    #>
+  #>
+[CmdletBinding()]
 Param(
-    [parameter(Mandatory=$false,ValueFromPipeline=$false,HelpMessage='Number of days for log files retention')]
-        [int]$DaysToKeep = 30,  
-    [parameter(Mandatory=$false,ValueFromPipeline=$false,HelpMessage='Use automatic folder detection for Exchange and IIS log paths')]
-        [switch]$Auto,
-    [parameter(Mandatory=$false,ValueFromPipeline=$false,HelpMessage='Send result summary as email')]
-        [switch]$SendMail,
-    [parameter(Mandatory=$false,ValueFromPipeline=$false,HelpMessage='Sender address for result summary')]
-        [string]$MailFrom = '',
-    [parameter(Mandatory=$false,ValueFromPipeline=$false,HelpMessage='Recipient address for result summary')]
-        [string]$MailTo = '',
-    [parameter(Mandatory=$false,ValueFromPipeline=$false,HelpMessage='SMTP Server address for sending result summary')]
-        [string]$MailServer = ''
+  [int]$DaysToKeep = 30,  
+  [switch]$Auto,
+  [switch]$SendMail,
+  [string]$MailFrom = '',
+  [string]$MailTo = '',
+  [string]$MailServer = ''
 )
 
-Set-StrictMode -Version Latest
 
 ## Set fixed IIS and Exchange log paths 
 ## Examples: 
 ##   "C$\inetpub\logs\LogFiles"
 ##   "C$\Program Files\Microsoft\Exchange Server\V15\Logging"
 
-[string]$IisUncLogPath = "D$\IISLogs"
-[string]$ExchangeUncLogPath = "E$\Program Files\Microsoft\Exchange Server\V15\Logging"
+[string]$IisUncLogPath = 'D$\IISLogs'
+[string]$ExchangeUncLogPath = 'E$\Program Files\Microsoft\Exchange Server\V15\Logging'
 
 # 2015-06-18: Implementationof global module
-Import-Module GlobalFunctions
-$ScriptDir = Split-Path $script:MyInvocation.MyCommand.Path
+Import-Module -Name GlobalFunctions
+$ScriptDir = Split-Path -Path $script:MyInvocation.MyCommand.Path
 $ScriptName = $MyInvocation.MyCommand.Name
 $logger = New-Logger -ScriptRoot $ScriptDir -ScriptName $ScriptName -LogFileRetention 14
 $logger.Write('Script started')
@@ -122,7 +118,7 @@ if($Auto) {
     [string]$ExchangeInstallPath = $env:ExchangeInstallPath
     [string]$ExchangeUncLogDrive = $ExchangeInstallPath.Split(':\')[0]
     $ExchangeUncLogPath = $ExchangeUncLogDrive + "$\" + $ExchangeInstallPath.Remove(0,3) + 'Logging\'
-    Join-Path -
+
     # Fetch local IIS log location from Metabase
     # IIS default location fixed 2015-02-02
     [string]$IisLogPath = ((Get-WebConfigurationProperty 'system.applicationHost/sites/siteDefaults' -Name logFile).directory).Replace('%SystemDrive%',$env:SystemDrive)
@@ -135,44 +131,45 @@ if($Auto) {
 # Function to clean log files from remote servers using UNC paths
 Function Remove-LogFiles   
 {
-    Param([string]$Path)
+  [CmdletBinding()]
+  Param([string]$Path)
 
     # Build full UNC path
     $TargetServerFolder = '\\' + $E15Server + '\' + $path
 
     # Write progress bar for current activity
-    Write-Progress -Activity "Checking Server $E15Server" -Status "Checking files in $TargetServerFolder" -PercentComplete(($i/$max)*100)
+    Write-Progress -Activity ('Checking Server {0}' -f $E15Server) -Status ('Checking files in {0}' -f $TargetServerFolder) -PercentComplete(($i/$max)*100)
 
     # Try to delete files only if folder exists
-    if (Test-Path $TargetServerFolder) {
+    if (Test-Path -Path $TargetServerFolder) {
         
         $Now = Get-Date
         $LastWrite = $Now.AddDays(-$DaysToKeep)
 
         # Select files to delete
-        $Files = Get-ChildItem $TargetServerFolder -Include *.log -Recurse | Where-Object {$_.LastWriteTime -le "$LastWrite"}
+        $Files = Get-ChildItem -Path $TargetServerFolder -Include *.log -Recurse | Where-Object {$_.LastWriteTime -le ('{0}' -f $LastWrite)}
 
         # Lets count the files that will be deleted
         $fileCount = 0
 
         # Delete the files
         foreach ($File in $Files)
-            {
-                Remove-Item $File -ErrorAction SilentlyContinue -Force | out-null
-                $fileCount++
-                }
+        {
+          Remove-Item -Path $File -ErrorAction SilentlyContinue -Force | out-null
+          $fileCount++
+        }
 
         #Write-Host "--> $fileCount files deleted in $TargetServerFolder" -ForegroundColor Gray
 
-        $logger.Write("$($fileCount) files deleted in $($TargetServerFolder)")
+        $logger.Write(('{0} files deleted in {1}' -f ($fileCount), ($TargetServerFolder)))
 
-        $Output = "<li>$fileCount files deleted in '$TargetServerFolder'</li>"
+        $Output = ("<li>{0} files deleted in '{1}'</li>" -f $fileCount, $TargetServerFolder)
     }
     Else {
         # oops, folder does not exist or is not accessible
-        Write-Host "The folder $TargetServerFolder doesn't exist or is not accessible! Check the folder path!" -ForegroundColor 'red'
+        Write-Host ("The folder {0} doesn't exist or is not accessible! Check the folder path!" -f $TargetServerFolder) -ForegroundColor 'red'
 
-        $Output = "The folder $TargetServerFolder doesn't exist or is not accessible! Check the folder path!"
+        $Output = ("The folder {0} doesn't exist or is not accessible! Check the folder path!" -f $TargetServerFolder)
     }
 
     $Output
@@ -181,7 +178,7 @@ Function Remove-LogFiles
 # Check if we are running in elevated mode
 # function (c) by Michel de Rooij, michel@eightwone.com
 Function Get-IsAdmin {
-    $currentPrincipal = New-Object Security.Principal.WindowsPrincipal( [Security.Principal.WindowsIdentity]::GetCurrent() )
+    $currentPrincipal = New-Object -TypeName Security.Principal.WindowsPrincipal -ArgumentList ( [Security.Principal.WindowsIdentity]::GetCurrent() )
     If( $currentPrincipal.IsInRole( [Security.Principal.WindowsBuiltInRole]::Administrator )) {
         return $true
     }
@@ -207,16 +204,16 @@ If (-Not (Get-CheckSendMail)) {
 If (Get-IsAdmin) {
     # We are running in elevated mode. Let's continue.
 
-    Write-Output "Removing IIS and Exchange logs - Keeping last $DaysToKeep days - Be patient, it might take some time"
+    Write-Host ('Removing IIS and Exchange logs - Keeping last {0} days - Be patient, it might take some time' -f $DaysToKeep)
 
     # Track script execution in Exchange Admin Audit Log 
     Write-AdminAuditLog -Comment 'Purge-LogFiles started!'
-    $logger.Write("Purge-LogFiles started, keeping last $($DaysToKeep) days of log files.")
+    $logger.Write(('Purge-LogFiles started, keeping last {0} days of log files.' -f ($DaysToKeep)))
 
     # Get a list of all Exchange 2013 servers
-    $Ex2013 = Get-ExchangeServer | Where-Object {$_.IsE15OrLater -eq $true} | Sort-Object Name
+    $Ex2013 = Get-ExchangeServer | Where-Object {$_.IsE15OrLater -eq $true} | Sort-Object -Property Name
 
-    $logger.WriteEventLog("Script started. Script will purge log files on: $($Ex2013)")
+    $logger.WriteEventLog(('Script started. Script will purge log files on: {0}' -f ($Ex2013)))
 
     # Lets count the steps for a nice progress bar
     $i = 1
@@ -231,8 +228,8 @@ If (Get-IsAdmin) {
     foreach ($E15Server In $Ex2013) {
         # Write-Host "Working on: $E15Server" -ForegroundColor Gray
 
-        $Output += "<h5>$E15Server</h5>
-        <ul>"
+        $Output += ('<h5>{0}</h5>
+        <ul>' -f $E15Server)
 
         $Output += Remove-LogFiles -Path $IisUncLogPath
         $i++
@@ -250,7 +247,7 @@ If (Get-IsAdmin) {
     </html>'
 
     if($SendMail) {
-        $logger.Write("Sending email to $($MailTo)")
+        $logger.Write(('Sending email to {0}' -f ($MailTo)))
         Send-Mail -From $MailFrom -To $MailTo -SmtpServer $MailServer -MessageBody $Output -Subject 'Purge-Logfiles Report'         
     }
 

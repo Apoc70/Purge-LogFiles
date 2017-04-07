@@ -1,7 +1,7 @@
 # Purge-LogFiles.ps1
 PowerShell script for Exchange Server 2013 environments to clean up Exchange and IIS log files.
 
-##Description
+## Description
 This script deletes all Exchange and IIS logs older than X days from all Exchange 2013 servers that are fetched using the Get-ExchangeServer cmdlet.
 
 The Exchange log file location is read from the environment variable and used to build an adminstrative UNC path for file deletions.
@@ -13,30 +13,32 @@ The IIS log file location is read from the local IIS metabase of the LOCAL serve
  
 It is assumed that the IIS log file location is identical across all Exchange servers
 
-##Inputs
-DaysToKeep
+## Requirements
+
+- Exchange Server 2013+
+- Exchange Management Shell (EMS)
+
+## Parameters
+### DaysToKeep
 Number of days Exchange and IIS log files should be retained, default is 30 days
 
-Auto
+### Auto
 Switch to use automatic detection of the IIS and Exchange log folder paths
 
-SendMail
+### SendMail
 Switch to send an Html report
 
-MailFrom
+### MailFrom
 Email address of report sender
 
-MailTo
+### MailTo
 Email address of report recipient
 
-MailServer
+### MailServer
 SMTP Server for email report
-  
 
-##Outputs
-Sends an HTML email, if specified, containing a short summary of deleted files per server.
 
-##Examples
+## Examples
 ```
 .\Purge-LogFiles -DaysToKeep 14
 ```
@@ -52,15 +54,15 @@ Delete Exchange and IIS log files older than 7 days with automatic discovery
 ```
 Delete Exchange and IIS log files older than 7 days with automatic discovery and send email report
 
-##TechNet Gallery
+## TechNet Gallery
 Find the script at TechNet Gallery
 * https://gallery.technet.microsoft.com/Purge-Exchange-Server-2013-c2e03e72
 
 
-##Credits
+## Credits
 Written by: Thomas Stensitzki
 
-Find me on:
+## Social
 
 * My Blog: https://www.granikos.eu/en/justcantgetenough
 * Archived Blog:	http://www.sf-tools.net/
