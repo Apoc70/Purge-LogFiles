@@ -9,16 +9,16 @@
   THIS CODE IS MADE AVAILABLE AS IS, WITHOUT WARRANTY OF ANY KIND. THE ENTIRE 
   RISK OF THE USE OR THE RESULTS FROM THE USE OF THIS CODE REMAINS WITH THE USER.
 	
-  Version 1.94, 2016-07-07
+  Version 2.0, 2017-04-07
 
   Ideas, comments and suggestions to support@granikos.eu 
  
   .LINK  
-  More information can be found at http://scripts.granikos.eu 
+  http://scripts-Granikos.eu
 	
   .DESCRIPTION
 	
-  This script deletes all Exchange and IIS logs older than X days from all Exchange 2013 servers
+  This script deletes all Exchange and IIS logs older than X days from all Exchange 2013+ servers
   that are fetched using the Get-ExchangeServer cmdlet.
 
   The Exchange log file location is read from the environment variable and used to build an 
@@ -53,7 +53,7 @@
   1.92    .Count issue fixed to run on Windows Server 2012
   1.93    Minor chances to PowerShell hygiene
   1.94    SendMail issue fixed (Thanks to denisvm, https://github.com/denisvm)
-  2.0     Script update
+  2.0     Script update, CopyFilesBeforeDelete implemented
 	
   .PARAMETER DaysToKeep
   Number of days Exchange and IIS log files should be retained, default is 30 days
@@ -72,6 +72,14 @@
 
   .PARAMETER MailServer
   SMTP Server for email report
+  
+  .PARAMETER CopyFilesBeforeDelete
+  Switch to copy log files to a central repository (UNC) before final deletion
+  Configure appropriate location in the script
+  
+  .PARAMETER ZipArchive
+  Create a zipped archive after sucessfully copying log file to repository.
+  CURRENTLY IN DEVELOPMENT
    
   .EXAMPLE
   Delete Exchange and IIS log files older than 14 days 
@@ -93,92 +101,179 @@ Param(
   [switch]$SendMail,
   [string]$MailFrom = '',
   [string]$MailTo = '',
-  [string]$MailServer = ''
+  [string]$MailServer = '',
+  [switch]$CopyFilesBeforeDelete,
+  [switch]$ZipArchive
 )
-
 
 ## Set fixed IIS and Exchange log paths 
 ## Examples: 
 ##   "C$\inetpub\logs\LogFiles"
 ##   "C$\Program Files\Microsoft\Exchange Server\V15\Logging"
 
-[string]$IisUncLogPath = 'D$\IISLogs'
-[string]$ExchangeUncLogPath = 'E$\Program Files\Microsoft\Exchange Server\V15\Logging'
+[string]$IisUncLogPath = 'E$\IISLogs'
+[string]$ExchangeUncLogPath = 'F$\Program Files\Microsoft\Exchange Server\V15\Logging'
+[string]$RepositoryRootPath = '\\MYSERVER\E$\PURGEREPOSITORY'
+[string[]]$IncludeFilter = @('*.log')
+[string]$ArchiveFileName =  "LogArchive $(Get-Date -Format 'yyyy-MM-dd').zip"
+[string]$LogSubfolderName = 'LOGS'
 
 # 2015-06-18: Implementationof global module
 Import-Module -Name GlobalFunctions
 $ScriptDir = Split-Path -Path $script:MyInvocation.MyCommand.Path
 $ScriptName = $MyInvocation.MyCommand.Name
 $logger = New-Logger -ScriptRoot $ScriptDir -ScriptName $ScriptName -LogFileRetention 14
-$logger.Write('Script started')
+$logger.Write("Script started")
 
 if($Auto) {
     # detect log file locations automatically an set variables
 
     [string]$ExchangeInstallPath = $env:ExchangeInstallPath
-    [string]$ExchangeUncLogDrive = $ExchangeInstallPath.Split(':\')[0]
-    $ExchangeUncLogPath = $ExchangeUncLogDrive + "$\" + $ExchangeInstallPath.Remove(0,3) + 'Logging\'
+    [string]$ExchangeUncLogDrive = $ExchangeInstallPath.Split(":\")[0]
+    $ExchangeUncLogPath = $ExchangeUncLogDrive + "$\" + $ExchangeInstallPath.Remove(0,3) + "Logging\"
 
     # Fetch local IIS log location from Metabase
     # IIS default location fixed 2015-02-02
-    [string]$IisLogPath = ((Get-WebConfigurationProperty 'system.applicationHost/sites/siteDefaults' -Name logFile).directory).Replace('%SystemDrive%',$env:SystemDrive)
+    [string]$IisLogPath = ((Get-WebConfigurationProperty "system.applicationHost/sites/siteDefaults" -Name logFile).directory).Replace("%SystemDrive%",$env:SystemDrive)
 
     # Extract drive letter and build log path
-    [string]$IisUncLogDrive =$IisLogPath.Split(':\')[0] 
+    [string]$IisUncLogDrive =$IisLogPath.Split(":\")[0] 
     $IisUncLogPath = $IisUncLogDrive + "$\" + $IisLogPath.Remove(0,3) 
 }
 
-# Function to clean log files from remote servers using UNC paths
-Function Remove-LogFiles   
-{
+function Copy-LogFiles {
   [CmdletBinding()]
-  Param([string]$Path)
+  param(
+    [string]$SourceServer,
+    [string]$SourcePath,
+    $FilesToMove
+  )
 
-    # Build full UNC path
-    $TargetServerFolder = '\\' + $E15Server + '\' + $path
+  if($SourceServer -ne '') { 
 
-    # Write progress bar for current activity
-    Write-Progress -Activity ('Checking Server {0}' -f $E15Server) -Status ('Checking files in {0}' -f $TargetServerFolder) -PercentComplete(($i/$max)*100)
+    # path per SERVER for zipped archives
+    $ServerRepositoryPath = Join-Path -Path $RepositoryRootPath -ChildPath $SourceServer
 
-    # Try to delete files only if folder exists
-    if (Test-Path -Path $TargetServerFolder) {
+    # subfolder used as target for copying source folders and files
+    $ServerRepositoryLogsPath = Join-Path -Path $ServerRepositoryPath -ChildPath $LogSubfolderName
+
+    $ServerRepositoryPath = Join-Path -Path $RepositoryRootPath -ChildPath $SourceServer
+
+    if(!(Test-Path -Path $ServerRepositoryPath)) {
+      # Create new target directory for server, if does not exist
+      $null = New-Item -Path $ServerRepositoryPath -ItemType Directory -Force -Confirm:$false
+    }
+
+    foreach ($File in $FilesToMove) {
+      # target directory
+      $targetDir = $File.DirectoryName.Replace($TargetServerFolder, $ServerRepositoryLogsPath)
+
+      # target file path
+      $targetFile = $File.FullName.Replace($TargetServerFolder, $ServerRepositoryLogsPath)
+      
+      # create target directory, if not exists
+      if(!(Test-Path -Path $targetDir)) {$null = mkdir -Path $targetDir}
+
+      # copy file to target
+      $null = Copy-Item -Path $File.FullName -Destination $targetFile -Recurse -Force -Confirm:$false -ErrorAction SilentlyContinue
+
+    }-Force   
+    
+    if($ZipArchive) {
+      # zip copied log files
+      #
+      <# NOT FULLY TESTED YET 
+      $Archive = Join-Path -Path $ServerRepositoryPath -ChildPath $ArchiveFileName
+      $logger.Write(('Zip copied files to {0}' -f $ArchiveFileName))
+
+      if(Test-Path -Path $Archive) {Remove-Item $Archive -Force -Confirm:$false}
+
+      Add-Type -AssemblyName 'System.IO.Compression.FileSystem'
+      [IO.Compression.ZipFile]::CreateFromDirectory($ServerRepositoryLogsPath,$Archive)
+
+      #>
+    } 
+  }  
+}
+
+# Function to clean log files from remote servers using UNC paths
+function Remove-LogFiles {
+  [CmdletBinding()]
+  Param(
+    [Parameter(Mandatory, HelpMessage='Absolute path to log file source')]
+    [string]$Path
+  )
+
+  # Build full UNC path
+  $TargetServerFolder = ('\\{0}\{1}' -f ($E15Server), ($Path))
+
+  # Write progress bar for current activity
+  Write-Progress -Activity ('Checking Server {0}' -f $E15Server) -Status ('Checking files in {0}' -f $TargetServerFolder) -PercentComplete(($i/$max)*100)
+
+  # Only try to delete files, if folder exists
+  if (Test-Path -Path $TargetServerFolder) {
         
-        $Now = Get-Date
-        $LastWrite = $Now.AddDays(-$DaysToKeep)
+      $LastWrite = (Get-Date).AddDays(-$DaysToKeep)
 
-        # Select files to delete
-        $Files = Get-ChildItem -Path $TargetServerFolder -Include *.log -Recurse | Where-Object {$_.LastWriteTime -le ('{0}' -f $LastWrite)}
+      # Select files to delete
+      $Files = Get-ChildItem -Path $TargetServerFolder -Include $IncludeFilter -Recurse | Where-Object {$_.LastWriteTime -le $LastWrite}
+      $FilesToDelete = ($Files | Measure-Object).Count
 
-        # Lets count the files that will be deleted
-        $fileCount = 0
+      # Lets count the files that will be deleted
+      $fileCount = 0
 
-        # Delete the files
-        foreach ($File in $Files)
-        {
-          Remove-Item -Path $File -ErrorAction SilentlyContinue -Force | out-null
-          $fileCount++
+      if($FilesToDelete -gt 0) {
+
+        if($CopyFilesBeforeDelete) {
+
+          # we want to copy all files to central repository before deletion
+          $logger.Write(('Copy {0} files from {1} to repository' -f $FilesToDelete.Count, $TargetServerFolder))
+
+          Copy-LogFiles -SourceServer $E15Server -SourcePath $TargetServerFolder -FilesToMove $Files
         }
 
-        #Write-Host "--> $fileCount files deleted in $TargetServerFolder" -ForegroundColor Gray
+        # Delete the files
+        foreach ($File in $Files) {
 
-        $logger.Write(('{0} files deleted in {1}' -f ($fileCount), ($TargetServerFolder)))
+            if($CopyFilesBeforeDelete) {
+                # 2016-11-16: TST Copy to central repository before file will be deleted
+                $logger.Write('Copy to repository')
+            }
 
+            $null = Remove-Item -Path $File -ErrorAction SilentlyContinue -Force
+            $fileCount++
+        }
+
+        # Write-Host "--> $fileCount files deleted in $TargetServerFolder" -ForegroundColor Gray
+
+        $logger.Write(('{0} files deleted in {1}' -f $fileCount, $TargetServerFolder))
+
+        #Html output
         $Output = ("<li>{0} files deleted in '{1}'</li>" -f $fileCount, $TargetServerFolder)
-    }
-    Else {
-        # oops, folder does not exist or is not accessible
-        Write-Host ("The folder {0} doesn't exist or is not accessible! Check the folder path!" -f $TargetServerFolder) -ForegroundColor 'red'
+      }
+      else {
+        $logger.Write(('No files to delete in {0}' -f $TargetServerFolder))
 
-        $Output = ("The folder {0} doesn't exist or is not accessible! Check the folder path!" -f $TargetServerFolder)
-    }
+        #Html output
+        $Output = ("<li>No files to delete in '{1}'</li>" -f $TargetServerFolder)
+      }
+  }
+  Else {
+      # oops, folder does not exist or is not accessible
+      Write-Host ("The folder {0} doesn't exist or is not accessible! Check the folder path!" -f $TargetServerFolder) -ForegroundColor Red
 
-    $Output
+      #Html output
+      $Output = ("The folder {0} doesn't exist or is not accessible! Check the folder path!" -f $TargetServerFolder)
+  }
+
+  $Output
 }
 
 # Check if we are running in elevated mode
 # function (c) by Michel de Rooij, michel@eightwone.com
 Function Get-IsAdmin {
     $currentPrincipal = New-Object -TypeName Security.Principal.WindowsPrincipal -ArgumentList ( [Security.Principal.WindowsIdentity]::GetCurrent() )
+
     If( $currentPrincipal.IsInRole( [Security.Principal.WindowsBuiltInRole]::Administrator )) {
         return $true
     }
@@ -187,8 +282,8 @@ Function Get-IsAdmin {
     }
 }
 
-Function Get-CheckSendMail {
-     if (-Not ($SendMail) -or ( ($SendMail) -and ($MailFrom -ne '') -and ($MailTo -ne '') -and ($MailServer -ne '') ) ) {
+Function Check-SendMail {
+     if( ($SendMail) -and ($MailFrom -ne "") -and ($MailTo -ne "") -and ($MailServer -ne "") ) {
         return $true
      }
      else {
@@ -197,32 +292,32 @@ Function Get-CheckSendMail {
 }
 
 # Main -----------------------------------------------------
-If (-Not (Get-CheckSendMail)) {
+If (-Not (Check-SendMail)) {
     Throw 'If -SendMail specified, -MailFrom, -MailTo and -MailServer must be specified as well!'
 }
 
 If (Get-IsAdmin) {
     # We are running in elevated mode. Let's continue.
 
-    Write-Host ('Removing IIS and Exchange logs - Keeping last {0} days - Be patient, it might take some time' -f $DaysToKeep)
+    Write-Output ('Removing IIS and Exchange logs - Keeping last {0} days - Be patient, it might take some time' -f $DaysToKeep)
 
     # Track script execution in Exchange Admin Audit Log 
-    Write-AdminAuditLog -Comment 'Purge-LogFiles started!'
+    Write-AdminAuditLog -Comment "Purge-LogFiles started!"
     $logger.Write(('Purge-LogFiles started, keeping last {0} days of log files.' -f ($DaysToKeep)))
 
     # Get a list of all Exchange 2013 servers
     $Ex2013 = Get-ExchangeServer | Where-Object {$_.IsE15OrLater -eq $true} | Sort-Object -Property Name
 
-    $logger.WriteEventLog(('Script started. Script will purge log files on: {0}' -f ($Ex2013)))
+    $logger.WriteEventLog(('Script started. Script will purge log files on: {0}' -f $Ex2013))
 
     # Lets count the steps for a nice progress bar
     $i = 1
-    $max = ($Ex2013 | Measure-Object).Count * 2 # two actions to execute per server
+    $max = $Ex2013.Count * 2 # two actions to execute per server
 
     # Prepare Output
     $Output = '<html>
     <body>
-    <font size="1" face="Arial,sans-serif">'
+    <font size=""1"" face=""Arial,sans-serif"">'
 
     # Call function for each server and each directory type
     foreach ($E15Server In $Ex2013) {
@@ -231,9 +326,11 @@ If (Get-IsAdmin) {
         $Output += ('<h5>{0}</h5>
         <ul>' -f $E15Server)
 
+        # Remove IIS log files
         $Output += Remove-LogFiles -Path $IisUncLogPath
         $i++
 
+        # Remove Exchange files
         $Output += Remove-LogFiles -Path $ExchangeUncLogPath
         $i++
 
@@ -247,13 +344,22 @@ If (Get-IsAdmin) {
     </html>'
 
     if($SendMail) {
-        $logger.Write(('Sending email to {0}' -f ($MailTo)))
-        Send-Mail -From $MailFrom -To $MailTo -SmtpServer $MailServer -MessageBody $Output -Subject 'Purge-Logfiles Report'         
+        $logger.Write(('Sending email to {0}' -f $MailTo))
+        try {
+            Send-Mail -From $MailFrom -To $MailTo -SmtpServer $MailServer -MessageBody $Output -Subject 'Purge-Logfiles Report'         
+        }
+        catch {
+            $logger.Write(('Error sending email to {0}' -f $MailTo),3)
+        }
     }
 
     $logger.Write('Script finished')
+
+    Return 0
 }
 else {
     # Ooops, the admin did it again.
     Write-Output 'The script need to be executed in elevated mode. Start the Exchange Management Shell as Administrator.'
+
+    Return 99
 }

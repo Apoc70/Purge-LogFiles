@@ -37,6 +37,14 @@ Email address of report recipient
 ### MailServer
 SMTP Server for email report
 
+### CopyFilesBeforeDelete
+Switch to copy log files to a central repository (UNC) before final deletion
+Configure appropriate location in the script
+
+### ZipArchive
+Create a zipped archive after sucessfully copying log file to repository.
+**CURRENTLY IN DEVELOPMENT**
+
 
 ## Examples
 ```
