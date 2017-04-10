@@ -1,6 +1,6 @@
 <#
   .SYNOPSIS
-  Purge Exchange 2013 and IIS logfiles across Exchange servers 
+  Purge Exchange 2013+ and IIS logfiles across Exchange servers 
    
   Thomas Stensitzki
   (Based Based on the original script by Brian Reid, C7 Solutions (c)
@@ -34,7 +34,7 @@
   .NOTES 
   Requirements 
   - Windows Server 2008 R2 SP1, Windows Server 2012 or Windows Server 2012 R2  
-  - Utilites global function library found here: 
+  - Utilites global function library found here: https://www.granikos.eu/en/justcantgetenough/PostId/210/globalfunctions-shared-powershell-library
   - Exchange 2013+ Management Shell
 
   Revision History 
