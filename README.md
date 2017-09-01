@@ -25,6 +25,17 @@ Number of days Exchange and IIS log files should be retained, default is 30 days
 ### Auto
 Switch to use automatic detection of the IIS and Exchange log folder paths
 
+### RepositoryRootPath
+Absolute path to a repository folder for storing copied log files and compressed archives. Preferably an UNC path. A new subfolder will be created for each Exchange server.
+
+### ArchiveMode
+Log file copy and archive mode. Possible values
+
+* _None_ = All log files will be purged without being copied 
+* _CopyOnly_ = Simply copy log files to the RepositoryRootPath
+* _CopyAndZip_ = Copy logfiles and send copied files to compressed archive
+* _CopyZipAndDelete_ = Same as CopyAndZip, but delete copied log files from RepositoryRootPath
+
 ### SendMail
 Switch to send an Html report
 
@@ -36,15 +47,6 @@ Email address of report recipient
 
 ### MailServer
 SMTP Server for email report
-
-### CopyFilesBeforeDelete
-Switch to copy log files to a central repository (UNC) before final deletion
-Configure appropriate location in the script
-
-### ZipArchive
-Create a zipped archive after sucessfully copying log file to repository.
-**CURRENTLY IN DEVELOPMENT**
-
 
 ## Examples
 ```
@@ -61,6 +63,11 @@ Delete Exchange and IIS log files older than 7 days with automatic discovery
 .\Purge-LogFiles -DaysToKeep 7 -Auto -SendMail -MailFrom postmaster@sedna-inc.com -MailTo exchangeadmin@sedna-inc.com -MailServer mail.sedna-inc.com 
 ```
 Delete Exchange and IIS log files older than 7 days with automatic discovery and send email report
+
+```
+.\Purge-LogFiles -DaysToKeep 14 -RepositoryRootPath \\OTHERSERVER\OtherShare\LOGS -ArchiveMode CopyZipAndDelete`
+```
+Delete Exchange and IIS log files older than 14 days, but copy files to a central repository and compress the log files before final deletion
 
 ## TechNet Gallery
 Find the script at TechNet Gallery

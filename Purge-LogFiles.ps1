@@ -9,12 +9,12 @@
   THIS CODE IS MADE AVAILABLE AS IS, WITHOUT WARRANTY OF ANY KIND. THE ENTIRE 
   RISK OF THE USE OR THE RESULTS FROM THE USE OF THIS CODE REMAINS WITH THE USER.
 	
-  Version 2.0, 2017-04-07
+  Version 2.1, 2017-09-01
 
   Ideas, comments and suggestions to support@granikos.eu 
  
   .LINK  
-  http://scripts-Granikos.eu
+  http://scripts.Granikos.eu
 	
   .DESCRIPTION
 	
@@ -34,7 +34,7 @@
   .NOTES 
   Requirements 
   - Windows Server 2008 R2 SP1, Windows Server 2012 or Windows Server 2012 R2  
-  - Utilites global function library found here: https://www.granikos.eu/en/justcantgetenough/PostId/210/globalfunctions-shared-powershell-library
+  - Utilizes the global function library found here: http://scripts.granikos.eu
   - Exchange 2013+ Management Shell
 
   Revision History 
@@ -53,13 +53,24 @@
   1.92    .Count issue fixed to run on Windows Server 2012
   1.93    Minor chances to PowerShell hygiene
   1.94    SendMail issue fixed (Thanks to denisvm, https://github.com/denisvm)
-  2.0     Script update, CopyFilesBeforeDelete implemented
+  2.0     Script update
+  2.1     Log file archiving and archive compressions added
 	
   .PARAMETER DaysToKeep
   Number of days Exchange and IIS log files should be retained, default is 30 days
 
   .PARAMETER Auto
   Switch to use automatic detection of the IIS and Exchange log folder paths
+
+  .PARAMETER RepositoryRootPath
+  Absolute path to a repository folder for storing copied log files and compressed archives. Preferably an UNC path. A new subfolder will be created fpr each Exchange server.
+
+  .PARAMETER ArchiveMode
+  Log file copy and archive mode. Possible values
+  None = All log files will be purged without being copied
+  CopyOnly = Simply copy log files to the RepositoryRootPath
+  CopyAndZip = Copy logfiles and send copied files to compressed archive
+  CopyZipAndDelete = Same as CopyAndZip, bt delete copied log files from RepositoryRootPath
 
   .PARAMETER SendMail
   Switch to send an Html report
@@ -72,26 +83,26 @@
 
   .PARAMETER MailServer
   SMTP Server for email report
-  
-  .PARAMETER CopyFilesBeforeDelete
-  Switch to copy log files to a central repository (UNC) before final deletion
-  Configure appropriate location in the script
-  
-  .PARAMETER ZipArchive
-  Create a zipped archive after sucessfully copying log file to repository.
-  CURRENTLY IN DEVELOPMENT
    
   .EXAMPLE
   Delete Exchange and IIS log files older than 14 days 
+
   .\Purge-LogFiles -DaysToKeep 14
 
   .EXAMPLE
   Delete Exchange and IIS log files older than 7 days with automatic discovery
+
   .\Purge-LogFiles -DaysToKeep 7 -Auto
 
   .EXAMPLE
   Delete Exchange and IIS log files older than 7 days with automatic discovery and send email report
+
   .\Purge-LogFiles -DaysToKeep 7 -Auto -SendMail -MailFrom postmaster@sedna-inc.com -MailTo exchangeadmin@sedna-inc.com -MailServer mail.sedna-inc.com 
+
+  .EXAMPLE
+  Delete Exchange and IIS log files older than 14 days, but copy files to a central repository and compress the log files before final deletion
+
+  .\Purge-LogFiles -DaysToKeep 14 -RepositoryRootPath \\OTHERSERVER\OtherShare\LOGS -ArchiveMode CopyZipAndDelete
 
   #>
 [CmdletBinding()]
@@ -102,8 +113,9 @@ Param(
   [string]$MailFrom = '',
   [string]$MailTo = '',
   [string]$MailServer = '',
-  [switch]$CopyFilesBeforeDelete,
-  [switch]$ZipArchive
+  [string]$RepositoryRootPath = '\\MYSERVER\SomeShare\EXCHANGELOGS',
+  [ValidateSet('None','CopyOnly','CopyAndZip','CopyZipAndDelete')] #Available archive modes, default: NONE
+  [string]$ArchiveMode = 'None'
 )
 
 ## Set fixed IIS and Exchange log paths 
@@ -111,30 +123,48 @@ Param(
 ##   "C$\inetpub\logs\LogFiles"
 ##   "C$\Program Files\Microsoft\Exchange Server\V15\Logging"
 
-[string]$IisUncLogPath = 'E$\IISLogs'
-[string]$ExchangeUncLogPath = 'F$\Program Files\Microsoft\Exchange Server\V15\Logging'
-[string]$RepositoryRootPath = '\\MYSERVER\E$\PURGEREPOSITORY'
+## ADJUST AS NEEDED
+[string]$IisUncLogPath = 'D$\IISLogs'
+[string]$ExchangeUncLogPath = 'E$\Program Files\Microsoft\Exchange Server\V15\Logging'
+
+# log file extension filter
 [string[]]$IncludeFilter = @('*.log')
-[string]$ArchiveFileName =  "LogArchive $(Get-Date -Format 'yyyy-MM-dd').zip"
+
+# filename template for archived log files
+[string]$ArchiveFileName =  "LogArchive $(Get-Date -Format 'yyyy-MM-dd HHmm').zip"
+
+# Folder name for a per Exchange server log files
+# Folder is used as target when copying log files
+# Folder will be deleted when using ArchiveMode CopyZipAndDelete
 [string]$LogSubfolderName = 'LOGS'
 
-# 2015-06-18: Implementationof global module
+# Some error variables
+$ERR_OK = 0
+$ERR_COMPRESSIONFAILED = 1080
+$ERR_NONELEVATEDMODE = 1099
+
+# Preset some archive switches
+[boolean]$CopyFiles = $false
+[boolean]$ZipArchive = $false
+[boolean]$DeleteZippedFiles = $false
+
+# 2015-06-18: Implementation of global functions module
 Import-Module -Name GlobalFunctions
 $ScriptDir = Split-Path -Path $script:MyInvocation.MyCommand.Path
 $ScriptName = $MyInvocation.MyCommand.Name
 $logger = New-Logger -ScriptRoot $ScriptDir -ScriptName $ScriptName -LogFileRetention 14
-$logger.Write("Script started")
+$logger.Write('Script started')
 
 if($Auto) {
-    # detect log file locations automatically an set variables
+    # detect log file locations automatically and set variables
 
     [string]$ExchangeInstallPath = $env:ExchangeInstallPath
     [string]$ExchangeUncLogDrive = $ExchangeInstallPath.Split(":\")[0]
-    $ExchangeUncLogPath = $ExchangeUncLogDrive + "$\" + $ExchangeInstallPath.Remove(0,3) + "Logging\"
+    $ExchangeUncLogPath = "$($ExchangeUncLogDrive)$\$($ExchangeInstallPath.Remove(0,3))Logging\"
 
     # Fetch local IIS log location from Metabase
     # IIS default location fixed 2015-02-02
-    [string]$IisLogPath = ((Get-WebConfigurationProperty "system.applicationHost/sites/siteDefaults" -Name logFile).directory).Replace("%SystemDrive%",$env:SystemDrive)
+    [string]$IisLogPath = ((Get-WebConfigurationProperty "system.applicationHost/sites/siteDefaults" -Name logFile).directory).Replace('%SystemDrive%',$env:SystemDrive)
 
     # Extract drive letter and build log path
     [string]$IisUncLogDrive =$IisLogPath.Split(":\")[0] 
@@ -146,7 +176,8 @@ function Copy-LogFiles {
   param(
     [string]$SourceServer,
     [string]$SourcePath,
-    $FilesToMove
+    $FilesToMove,
+    [string]$ArchivePrefix = ''
   )
 
   if($SourceServer -ne '') { 
@@ -160,8 +191,10 @@ function Copy-LogFiles {
     $ServerRepositoryPath = Join-Path -Path $RepositoryRootPath -ChildPath $SourceServer
 
     if(!(Test-Path -Path $ServerRepositoryPath)) {
+
       # Create new target directory for server, if does not exist
       $null = New-Item -Path $ServerRepositoryPath -ItemType Directory -Force -Confirm:$false
+
     }
 
     foreach ($File in $FilesToMove) {
@@ -177,21 +210,35 @@ function Copy-LogFiles {
       # copy file to target
       $null = Copy-Item -Path $File.FullName -Destination $targetFile -Recurse -Force -Confirm:$false -ErrorAction SilentlyContinue
 
-    }-Force   
+    }    
     
     if($ZipArchive) {
       # zip copied log files
-      #
-      <# NOT FULLY TESTED YET 
-      $Archive = Join-Path -Path $ServerRepositoryPath -ChildPath $ArchiveFileName
+      
+      $Archive = Join-Path -Path $ServerRepositoryPath -ChildPath ('{0}-{1}' -f $ArchivePrefix, $ArchiveFileName)
       $logger.Write(('Zip copied files to {0}' -f $ArchiveFileName))
+      
+      # delete archive file, if already exists
+      if(Test-Path -Path $Archive) {Remove-Item -Path $Archive -Force -Confirm:$false}
 
-      if(Test-Path -Path $Archive) {Remove-Item $Archive -Force -Confirm:$false}
+      try {
+        # create zipped asrchive
+        Add-Type -AssemblyName 'System.IO.Compression.FileSystem'
+        [IO.Compression.ZipFile]::CreateFromDirectory($ServerRepositoryLogsPath,$Archive)
+      }
+      catch {
+        $logger.Write(('Error compressing files from {0} to {1}' -f $ServerRepositoryLogsPath, $Archive),3)      
+      }
+      finally {
 
-      Add-Type -AssemblyName 'System.IO.Compression.FileSystem'
-      [IO.Compression.ZipFile]::CreateFromDirectory($ServerRepositoryLogsPath,$Archive)
+        # cleanup, if compression was successful
+        if($DeleteZippedFiles) {
 
-      #>
+          $logger.Write(('Deleting folder {0}' -f $ServerRepositoryLogsPath))
+          $null = Remove-Item -Path $ServerRepositoryLogsPath -Recurse -Force -Confirm:$false -ErrorAction SilentlyContinue
+
+        }
+      }
     } 
   }  
 }
@@ -201,7 +248,9 @@ function Remove-LogFiles {
   [CmdletBinding()]
   Param(
     [Parameter(Mandatory, HelpMessage='Absolute path to log file source')]
-    [string]$Path
+    [string]$Path,
+    [ValidateSet('IIS','Exchange')] 
+    [string]$Type = 'IIS'
   )
 
   # Build full UNC path
@@ -216,7 +265,7 @@ function Remove-LogFiles {
       $LastWrite = (Get-Date).AddDays(-$DaysToKeep)
 
       # Select files to delete
-      $Files = Get-ChildItem -Path $TargetServerFolder -Include $IncludeFilter -Recurse | Where-Object {$_.LastWriteTime -le $LastWrite}
+      $Files = Get-ChildItem -Path $TargetServerFolder -Include $IncludeFilter -Recurse -ErrorAction SilentlyContinue | Where-Object {$_.LastWriteTime -le $LastWrite}
       $FilesToDelete = ($Files | Measure-Object).Count
 
       # Lets count the files that will be deleted
@@ -224,27 +273,16 @@ function Remove-LogFiles {
 
       if($FilesToDelete -gt 0) {
 
-        if($CopyFilesBeforeDelete) {
+        if($CopyFiles) {
 
-          # we want to copy all files to central repository before deletion
+          # we want to copy all files to central repository before final deletion
           $logger.Write(('Copy {0} files from {1} to repository' -f $FilesToDelete.Count, $TargetServerFolder))
 
-          Copy-LogFiles -SourceServer $E15Server -SourcePath $TargetServerFolder -FilesToMove $Files
+          # Write progress bar for current activity
+          Write-Progress -Activity ('Checking Server {0}' -f $E15Server) -Status 'Copying log files' -PercentComplete(($i/$max)*100)
+
+          Copy-LogFiles -SourceServer $E15Server -SourcePath $TargetServerFolder -FilesToMove $Files -ArchivePrefix $Type
         }
-
-        # Delete the files
-        foreach ($File in $Files) {
-
-            if($CopyFilesBeforeDelete) {
-                # 2016-11-16: TST Copy to central repository before file will be deleted
-                $logger.Write('Copy to repository')
-            }
-
-            $null = Remove-Item -Path $File -ErrorAction SilentlyContinue -Force
-            $fileCount++
-        }
-
-        # Write-Host "--> $fileCount files deleted in $TargetServerFolder" -ForegroundColor Gray
 
         $logger.Write(('{0} files deleted in {1}' -f $fileCount, $TargetServerFolder))
 
@@ -255,7 +293,7 @@ function Remove-LogFiles {
         $logger.Write(('No files to delete in {0}' -f $TargetServerFolder))
 
         #Html output
-        $Output = ("<li>No files to delete in '{1}'</li>" -f $TargetServerFolder)
+        $Output = ("<li>No files to delete in '{0}'</li>" -f $TargetServerFolder)
       }
   }
   Else {
@@ -282,8 +320,9 @@ Function Get-IsAdmin {
     }
 }
 
+# Check validity of parameters required for sending emails 
 Function Check-SendMail {
-     if( ($SendMail) -and ($MailFrom -ne "") -and ($MailTo -ne "") -and ($MailServer -ne "") ) {
+     if( ($SendMail) -and ($MailFrom -ne '') -and ($MailTo -ne '') -and ($MailServer -ne '') ) {
         return $true
      }
      else {
@@ -292,8 +331,25 @@ Function Check-SendMail {
 }
 
 # Main -----------------------------------------------------
+
 If (-Not (Check-SendMail)) {
     Throw 'If -SendMail specified, -MailFrom, -MailTo and -MailServer must be specified as well!'
+}
+
+Switch($ArchiveMode) {
+  'CopyOnly' {
+    $CopyFiles = $true
+  }
+  'CopyAndZip' {
+    $CopyFiles = $true
+    $ZipArchive = $true
+  }
+  'CopyZipAndDelete' {
+    $CopyFiles = $true
+    $ZipArchive = $true
+    $DeleteZippedFiles = $true
+  }
+  default { }
 }
 
 If (Get-IsAdmin) {
@@ -302,17 +358,17 @@ If (Get-IsAdmin) {
     Write-Output ('Removing IIS and Exchange logs - Keeping last {0} days - Be patient, it might take some time' -f $DaysToKeep)
 
     # Track script execution in Exchange Admin Audit Log 
-    Write-AdminAuditLog -Comment "Purge-LogFiles started!"
+    Write-AdminAuditLog -Comment 'Purge-LogFiles started!'
     $logger.Write(('Purge-LogFiles started, keeping last {0} days of log files.' -f ($DaysToKeep)))
 
     # Get a list of all Exchange 2013 servers
-    $Ex2013 = Get-ExchangeServer | Where-Object {$_.IsE15OrLater -eq $true} | Sort-Object -Property Name
+    $AllExchangeServers = Get-ExchangeServer | Where-Object {$_.IsE15OrLater -eq $true} | Sort-Object -Property Name
 
-    $logger.WriteEventLog(('Script started. Script will purge log files on: {0}' -f $Ex2013))
+    $logger.WriteEventLog(('Script started. Script will purge log files on: {0}' -f $AllExchangeServers))
 
     # Lets count the steps for a nice progress bar
     $i = 1
-    $max = $Ex2013.Count * 2 # two actions to execute per server
+    $max = $AllExchangeServers.Count * 2 # two actions to execute per server
 
     # Prepare Output
     $Output = '<html>
@@ -320,18 +376,18 @@ If (Get-IsAdmin) {
     <font size=""1"" face=""Arial,sans-serif"">'
 
     # Call function for each server and each directory type
-    foreach ($E15Server In $Ex2013) {
+    foreach ($E15Server In $AllExchangeServers) {
         # Write-Host "Working on: $E15Server" -ForegroundColor Gray
 
         $Output += ('<h5>{0}</h5>
         <ul>' -f $E15Server)
 
         # Remove IIS log files
-        $Output += Remove-LogFiles -Path $IisUncLogPath
+        $Output += Remove-LogFiles -Path $IisUncLogPath -Type IIS
         $i++
 
         # Remove Exchange files
-        $Output += Remove-LogFiles -Path $ExchangeUncLogPath
+        $Output += Remove-LogFiles -Path $ExchangeUncLogPath -Type Exchange
         $i++
 
         $Output+='</ul>'
@@ -355,11 +411,11 @@ If (Get-IsAdmin) {
 
     $logger.Write('Script finished')
 
-    Return 0
+    Return $ERR_OK
 }
 else {
     # Ooops, the admin did it again.
-    Write-Output 'The script need to be executed in elevated mode. Start the Exchange Management Shell as Administrator.'
+    Write-Output 'The script need to be executed in elevated mode. Start the Exchange Management Shell with administrative privileges.'
 
-    Return 99
+    Return $ERR_NONELEVATEDMODE
 }
