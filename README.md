@@ -1,3 +1,6 @@
+NOTE: Update to v2.11 if you are using v2.1
+
+
 # Purge-LogFiles.ps1
 PowerShell script for Exchange Server 2013 environments to clean up Exchange and IIS log files.
 

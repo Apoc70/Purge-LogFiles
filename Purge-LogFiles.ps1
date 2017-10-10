@@ -9,7 +9,7 @@
   THIS CODE IS MADE AVAILABLE AS IS, WITHOUT WARRANTY OF ANY KIND. THE ENTIRE 
   RISK OF THE USE OR THE RESULTS FROM THE USE OF THIS CODE REMAINS WITH THE USER.
 	
-  Version 2.1, 2017-09-01
+  Version 2.11, 2017-10-10
 
   Ideas, comments and suggestions to support@granikos.eu 
  
@@ -55,6 +55,7 @@
   1.94    SendMail issue fixed (Thanks to denisvm, https://github.com/denisvm)
   2.0     Script update
   2.1     Log file archiving and archive compressions added
+  2.11    Issue #6 fixed 
 	
   .PARAMETER DaysToKeep
   Number of days Exchange and IIS log files should be retained, default is 30 days
@@ -283,6 +284,15 @@ function Remove-LogFiles {
 
           Copy-LogFiles -SourceServer $E15Server -SourcePath $TargetServerFolder -FilesToMove $Files -ArchivePrefix $Type
         }
+        
+        # Delete the files
+        foreach ($File in $Files) {
+          
+          $null = Remove-Item -Path $File -ErrorAction SilentlyContinue -Force
+          
+          $fileCount++
+        }
+        
 
         $logger.Write(('{0} files deleted in {1}' -f $fileCount, $TargetServerFolder))
 
