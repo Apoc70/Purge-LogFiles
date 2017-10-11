@@ -9,7 +9,7 @@
   THIS CODE IS MADE AVAILABLE AS IS, WITHOUT WARRANTY OF ANY KIND. THE ENTIRE 
   RISK OF THE USE OR THE RESULTS FROM THE USE OF THIS CODE REMAINS WITH THE USER.
 	
-  Version 2.11, 2017-10-10
+  Version 2.1, 32017-10-11
 
   Ideas, comments and suggestions to support@granikos.eu 
  
@@ -56,6 +56,7 @@
   2.0     Script update
   2.1     Log file archiving and archive compressions added
   2.11    Issue #6 fixed 
+  2.13    Issue #7 fixed
 	
   .PARAMETER DaysToKeep
   Number of days Exchange and IIS log files should be retained, default is 30 days
@@ -335,7 +336,7 @@ Function Get-IsAdmin {
 
 # Check validity of parameters required for sending emails 
 Function Check-SendMail {
-     if( ($SendMail) -and ($MailFrom -ne '') -and ($MailTo -ne '') -and ($MailServer -ne '') ) {
+     if( ($MailFrom -ne '') -and ($MailTo -ne '') -and ($MailServer -ne '') ) {
         return $true
      }
      else {
@@ -345,8 +346,10 @@ Function Check-SendMail {
 
 # Main -----------------------------------------------------
 
-If (-Not (Check-SendMail)) {
-    Throw 'If -SendMail specified, -MailFrom, -MailTo and -MailServer must be specified as well!'
+If ($SendMail.IsPresent) { 
+  If (-Not (Check-SendMail)) {
+      Throw 'If -SendMail specified, -MailFrom, -MailTo and -MailServer must be specified as well!'
+  }
 }
 
 Switch($ArchiveMode) {
