@@ -149,6 +149,9 @@ $ERR_NONELEVATEDMODE = 1099
 [boolean]$ZipArchive = $false
 [boolean]$DeleteZippedFiles = $false
 
+# Import Exchange functions
+Add-PSSnapin Microsoft.Exchange.Management.PowerShell.SnapIn
+
 # 2015-06-18: Implementation of global functions module
 Import-Module -Name GlobalFunctions
 $ScriptDir = Split-Path -Path $script:MyInvocation.MyCommand.Path
