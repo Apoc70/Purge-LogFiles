@@ -1,6 +1,6 @@
 # IMPORTANT NOTE
 
-Update to v2.11 if you are using v2.1
+Update to most current release if you are using _v2.1_
 
 # Purge-LogFiles.ps1
 
@@ -32,6 +32,10 @@ Number of days Exchange and IIS log files should be retained, default is 30 days
 ### Auto
 
 Switch to use automatic detection of the IIS and Exchange log folder paths
+
+### IsEdge
+
+Indicates the the script is executed on an Exchange Server holding the EDGE role. Without the switch servers holding the EDGE role are excluded
 
 ### RepositoryRootPath
 

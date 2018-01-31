@@ -9,7 +9,7 @@
   THIS CODE IS MADE AVAILABLE AS IS, WITHOUT WARRANTY OF ANY KIND. THE ENTIRE 
   RISK OF THE USE OR THE RESULTS FROM THE USE OF THIS CODE REMAINS WITH THE USER.
 	
-  Version 2.1, 32017-10-11
+  Version 2.14, 2018-01-31
 
   Ideas, comments and suggestions to support@granikos.eu 
  
@@ -57,12 +57,16 @@
   2.1     Log file archiving and archive compressions added
   2.11    Issue #6 fixed 
   2.13    Issue #7 fixed
+  2.14    Issue #9 fixed
 	
   .PARAMETER DaysToKeep
   Number of days Exchange and IIS log files should be retained, default is 30 days
 
   .PARAMETER Auto
   Switch to use automatic detection of the IIS and Exchange log folder paths
+
+  .PARAMETER IsEdge
+  Indicates the the script is executed on an Exchange Server holding the EDGE role. Without the switch servers holding the EDGE role are excluded
 
   .PARAMETER RepositoryRootPath
   Absolute path to a repository folder for storing copied log files and compressed archives. Preferably an UNC path. A new subfolder will be created fpr each Exchange server.
@@ -109,15 +113,16 @@
   #>
 [CmdletBinding()]
 Param(
-  [int]$DaysToKeep = 30,  
-  [switch]$Auto,
-  [switch]$SendMail,
-  [string]$MailFrom = '',
-  [string]$MailTo = '',
-  [string]$MailServer = '',
-  [string]$RepositoryRootPath = '\\MYSERVER\SomeShare\EXCHANGELOGS',
+  [int] $DaysToKeep = 30,  
+  [switch] $Auto,
+  [switch] $IsEdge,
+  [switch] $SendMail,
+  [string] $MailFrom = '',
+  [string] $MailTo = '',
+  [string] $MailServer = '',
+  [string] $RepositoryRootPath = '\\MYSERVER\SomeShare\EXCHANGELOGS',
   [ValidateSet('None','CopyOnly','CopyAndZip','CopyZipAndDelete')] #Available archive modes, default: NONE
-  [string]$ArchiveMode = 'None'
+  [string] $ArchiveMode = 'None'
 )
 
 ## Set fixed IIS and Exchange log paths 
@@ -146,9 +151,9 @@ $ERR_COMPRESSIONFAILED = 1080
 $ERR_NONELEVATEDMODE = 1099
 
 # Preset some archive switches
-[boolean]$CopyFiles = $false
-[boolean]$ZipArchive = $false
-[boolean]$DeleteZippedFiles = $false
+[bool]$CopyFiles = $false
+[bool]$ZipArchive = $false
+[bool]$DeleteZippedFiles = $false
 
 # Import Exchange functions
 Add-PSSnapin Microsoft.Exchange.Management.PowerShell.SnapIn
@@ -164,23 +169,23 @@ if($Auto) {
     # detect log file locations automatically and set variables
 
     [string]$ExchangeInstallPath = $env:ExchangeInstallPath
-    [string]$ExchangeUncLogDrive = $ExchangeInstallPath.Split(":\")[0]
-    $ExchangeUncLogPath = "$($ExchangeUncLogDrive)$\$($ExchangeInstallPath.Remove(0,3))Logging\"
+    [string]$ExchangeUncLogDrive = $ExchangeInstallPath.Split(':\')[0]
+    $ExchangeUncLogPath = ('{0}$\{1}Logging\' -f ($ExchangeUncLogDrive), $ExchangeInstallPath.Remove(0,3))
 
     # Fetch local IIS log location from Metabase
     # IIS default location fixed 2015-02-02
-    [string]$IisLogPath = ((Get-WebConfigurationProperty "system.applicationHost/sites/siteDefaults" -Name logFile).directory).Replace('%SystemDrive%',$env:SystemDrive)
+    [string]$IisLogPath = ((Get-WebConfigurationProperty 'system.applicationHost/sites/siteDefaults' -Name logFile).directory).Replace('%SystemDrive%',$env:SystemDrive)
 
     # Extract drive letter and build log path
-    [string]$IisUncLogDrive =$IisLogPath.Split(":\")[0] 
-    $IisUncLogPath = $IisUncLogDrive + "$\" + $IisLogPath.Remove(0,3) 
+    [string]$IisUncLogDrive =$IisLogPath.Split(':\')[0] 
+    $IisUncLogPath = $IisUncLogDrive + '$\' + $IisLogPath.Remove(0,3) 
 }
 
 function Copy-LogFiles {
   [CmdletBinding()]
   param(
-    [string]$SourceServer,
-    [string]$SourcePath,
+    [string] $SourceServer = '',
+    [string]$SourcePath = '',
     $FilesToMove,
     [string]$ArchivePrefix = ''
   )
@@ -376,9 +381,17 @@ If (Get-IsAdmin) {
     # Track script execution in Exchange Admin Audit Log 
     Write-AdminAuditLog -Comment 'Purge-LogFiles started!'
     $logger.Write(('Purge-LogFiles started, keeping last {0} days of log files.' -f ($DaysToKeep)))
+    
+    $AllExchangeServers = $null
 
-    # Get a list of all Exchange 2013 servers
-    $AllExchangeServers = Get-ExchangeServer | Where-Object {$_.IsE15OrLater -eq $true} | Sort-Object -Property Name
+    if($IsEdge) { 
+      # Get a list of all Exchange V15* servers
+      $AllExchangeServers = Get-ExchangeServer | Where-Object {$_.IsE15OrLater -eq $true} | Sort-Object -Property Name
+    }
+    else {
+      # Get a list of all Exchange V15* servers, exclude server service the EDGE role
+      $AllExchangeServers = Get-ExchangeServer | Where-Object {($_.IsE15OrLater -eq $true) -and ($_.ServerRole -notmatch 'Edge')} | Sort-Object -Property Name
+    }
 
     $logger.WriteEventLog(('Script started. Script will purge log files on: {0}' -f $AllExchangeServers))
 
