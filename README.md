@@ -20,6 +20,7 @@ It is assumed that the IIS log file location is identical across all Exchange se
 
 ## Requirements
 
+- Utilizes the global function library found here: [http://scripts.granikos.eu](http://scripts.granikos.eu)
 - Exchange Server 2013+
 - Exchange Management Shell (EMS)
 
