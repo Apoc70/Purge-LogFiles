@@ -9,7 +9,7 @@
   THIS CODE IS MADE AVAILABLE AS IS, WITHOUT WARRANTY OF ANY KIND. THE ENTIRE 
   RISK OF THE USE OR THE RESULTS FROM THE USE OF THIS CODE REMAINS WITH THE USER.
 	
-  Version 2.14, 2018-01-31
+  Version 2.2, 2018-03-13
 
   Ideas, comments and suggestions to support@granikos.eu 
  
@@ -58,6 +58,7 @@
   2.11    Issue #6 fixed 
   2.13    Issue #7 fixed
   2.14    Issue #9 fixed
+  2.2     Minor changes, but no fixes
 	
   .PARAMETER DaysToKeep
   Number of days Exchange and IIS log files should be retained, default is 30 days
@@ -156,7 +157,7 @@ $ERR_NONELEVATEDMODE = 1099
 [bool]$DeleteZippedFiles = $false
 
 # Import Exchange functions
-Add-PSSnapin Microsoft.Exchange.Management.PowerShell.SnapIn
+Add-PSSnapin -Name Microsoft.Exchange.Management.PowerShell.SnapIn
 
 # 2015-06-18: Implementation of global functions module
 Import-Module -Name GlobalFunctions
@@ -174,7 +175,7 @@ if($Auto) {
 
     # Fetch local IIS log location from Metabase
     # IIS default location fixed 2015-02-02
-    [string]$IisLogPath = ((Get-WebConfigurationProperty 'system.applicationHost/sites/siteDefaults' -Name logFile).directory).Replace('%SystemDrive%',$env:SystemDrive)
+    [string]$IisLogPath = ((Get-WebConfigurationProperty -Filter 'system.applicationHost/sites/siteDefaults' -Name logFile).directory).Replace('%SystemDrive%',$env:SystemDrive)
 
     # Extract drive letter and build log path
     [string]$IisUncLogDrive =$IisLogPath.Split(':\')[0] 
@@ -237,7 +238,8 @@ function Copy-LogFiles {
         [IO.Compression.ZipFile]::CreateFromDirectory($ServerRepositoryLogsPath,$Archive)
       }
       catch {
-        $logger.Write(('Error compressing files from {0} to {1}' -f $ServerRepositoryLogsPath, $Archive),3)      
+        $ErrorMessage = $_.Exception.Message
+        $logger.Write(('Error compressing files from {0} to {1}. Error Message: {2}' -f $ServerRepositoryLogsPath, $Archive, $ErrorMessage),3)      
       }
       finally {
 
@@ -267,7 +269,7 @@ function Remove-LogFiles {
   $TargetServerFolder = ('\\{0}\{1}' -f ($E15Server), ($Path))
 
   # Write progress bar for current activity
-  Write-Progress -Activity ('Checking Server {0}' -f $E15Server) -Status ('Checking files in {0}' -f $TargetServerFolder) -PercentComplete(($i/$max)*100)
+  Write-Progress -Activity ('Checking files on Server {0}' -f $E15Server) -Status ('Checking files in {0}' -f $TargetServerFolder) -PercentComplete(($i/$max)*100)
 
   # Only try to delete files, if folder exists
   if (Test-Path -Path $TargetServerFolder) {
@@ -289,15 +291,15 @@ function Remove-LogFiles {
           $logger.Write(('Copy {0} files from {1} to repository' -f $FilesToDelete.Count, $TargetServerFolder))
 
           # Write progress bar for current activity
-          Write-Progress -Activity ('Checking Server {0}' -f $E15Server) -Status 'Copying log files' -PercentComplete(($i/$max)*100)
+          Write-Progress -Activity ('Checking files on Server {0}' -f $E15Server) -Status 'Copying log files' -PercentComplete(($i/$max)*100)
 
           Copy-LogFiles -SourceServer $E15Server -SourcePath $TargetServerFolder -FilesToMove $Files -ArchivePrefix $Type
         }
         
-        # Delete the files
+        # Delete the files -> purge
         foreach ($File in $Files) {
           
-          $null = Remove-Item -Path $File -ErrorAction SilentlyContinue -Force
+          $null = Remove-Item -Path $File -ErrorAction SilentlyContinue -Force 
           
           $fileCount++
         }
@@ -328,7 +330,7 @@ function Remove-LogFiles {
 
 # Check if we are running in elevated mode
 # function (c) by Michel de Rooij, michel@eightwone.com
-Function Get-IsAdmin {
+Function script:Test-IsAdmin {
     $currentPrincipal = New-Object -TypeName Security.Principal.WindowsPrincipal -ArgumentList ( [Security.Principal.WindowsIdentity]::GetCurrent() )
 
     If( $currentPrincipal.IsInRole( [Security.Principal.WindowsBuiltInRole]::Administrator )) {
@@ -340,7 +342,7 @@ Function Get-IsAdmin {
 }
 
 # Check validity of parameters required for sending emails 
-Function Check-SendMail {
+Function script:Test-SendMail {
      if( ($MailFrom -ne '') -and ($MailTo -ne '') -and ($MailServer -ne '') ) {
         return $true
      }
@@ -352,7 +354,7 @@ Function Check-SendMail {
 # Main -----------------------------------------------------
 
 If ($SendMail.IsPresent) { 
-  If (-Not (Check-SendMail)) {
+  If (-Not (Test-SendMail)) {
       Throw 'If -SendMail specified, -MailFrom, -MailTo and -MailServer must be specified as well!'
   }
 }
@@ -373,7 +375,7 @@ Switch($ArchiveMode) {
   default { }
 }
 
-If (Get-IsAdmin) {
+If (Test-IsAdmin) {
     # We are running in elevated mode. Let's continue.
 
     Write-Output ('Removing IIS and Exchange logs - Keeping last {0} days - Be patient, it might take some time' -f $DaysToKeep)
