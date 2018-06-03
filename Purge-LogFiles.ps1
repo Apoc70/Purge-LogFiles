@@ -9,7 +9,7 @@
   THIS CODE IS MADE AVAILABLE AS IS, WITHOUT WARRANTY OF ANY KIND. THE ENTIRE 
   RISK OF THE USE OR THE RESULTS FROM THE USE OF THIS CODE REMAINS WITH THE USER.
 	
-  Version 2.2, 2018-03-13
+  Version 2.21, 2018-06-03
 
   Ideas, comments and suggestions to support@granikos.eu 
  
@@ -59,6 +59,7 @@
   2.13    Issue #7 fixed
   2.14    Issue #9 fixed
   2.2     Minor changes, but no fixes
+  2.21    Issue #12 fixed
 	
   .PARAMETER DaysToKeep
   Number of days Exchange and IIS log files should be retained, default is 30 days
@@ -234,7 +235,8 @@ function Copy-LogFiles {
 
       try {
         # create zipped asrchive
-        Add-Type -AssemblyName 'System.IO.Compression.FileSystem'
+        # Add-Type -AssemblyName 'System.IO.Compression.FileSystem'
+        [Reflection.Assembly]::LoadWithPartialName("System.IO.Compression.FileSystem")
         [IO.Compression.ZipFile]::CreateFromDirectory($ServerRepositoryLogsPath,$Archive)
       }
       catch {
@@ -399,7 +401,8 @@ If (Test-IsAdmin) {
 
     # Lets count the steps for a nice progress bar
     $i = 1
-    $max = $AllExchangeServers.Count * 2 # two actions to execute per server
+    # Issue #12, Using Mesaure-Object to ensure that we have a Count property
+    $max = ($AllExchangeServers | Measure-Object).Count * 2 # two actions to execute per server
 
     # Prepare Output
     $Output = '<html>
