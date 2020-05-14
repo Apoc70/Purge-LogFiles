@@ -64,7 +64,8 @@
     2.14    Issue #9 fixed
     2.2     Minor changes, but no fixes
     2.21    Issue #12 fixed
-    2.3     Option for HTTPERR added, Option for dynamic Exchange install paths added, Html formatting added, tested with Exchange Server 2019
+    2.3     Option for HTTPERR (#13) added, Option for dynamic Exchange install paths added, Html formatting added, tested with Exchange Server 2019
+    2.3.1   Issues #14, #15
 	
     .PARAMETER DaysToKeep
     Number of days Exchange and IIS log files should be retained, default is 30 days
@@ -152,7 +153,8 @@ Param(
 
 ## ADJUST AS NEEDED
 [string]$IisUncLogPath = 'D$\IISLogs'
-[string]$ExchangeUncLogPath = 'D$\Program Files\Microsoft\Exchange Server\V15\Logging'
+[string]$ExchangeUncLogPath = 'C$\Program Files\Microsoft\Exchange Server\V15\Logging'
+[string]$ExchangeUncActiveMonitoringLogPath = 'C$\Program Files\Microsoft\Exchange Server\V15\Logging\Monitoring\Monitoring'
 [string]$HttpErrUncLogPath= 'C$\Windows\System32\LogFiles\HTTPERR'
 
 # log file extension filter
@@ -177,7 +179,7 @@ $ERR_NONELEVATEDMODE = 1099
 [bool]$DeleteZippedFiles = $false
 
 # Import Exchange functions
-Add-PSSnapin -Name Microsoft.Exchange.Management.PowerShell.SnapIn
+Add-PSSnapin -Name Microsoft.Exchange.Management.PowerShell.SnapIn -ErrorAction SilentlyContinue
 
 # Import Active Directory Module
 Import-Module -Name ActiveDirectory
@@ -203,14 +205,13 @@ if($Auto) {
   # Extract drive letter and build log path
   [string]$IisUncLogDrive =$IisLogPath.Split(':\')[0] 
   $IisUncLogPath = $IisUncLogDrive + '$\' + $IisLogPath.Remove(0,3) 
-
 }
 
 function Get-ExchangeServerProperty {
   [CmdletBinding()]
   param (
-    [string]$ServerName,
-    [string]$PropertyName
+    [string]$ServerName = '',
+    [string]$PropertyName = ''
   )
 
   # get forest name as array
@@ -237,7 +238,7 @@ function Get-ExchangeServerProperty {
 function Get-ExchangeServerDynamicPath {
   [CmdletBinding()]
   param(
-    [string]$ServerName
+    [string]$ServerName = ''
   )
 
   $UncPurgePath = ''
@@ -307,7 +308,7 @@ function Copy-LogFiles {
       try {
         # create zipped asrchive
         # Add-Type -AssemblyName 'System.IO.Compression.FileSystem'
-        [Reflection.Assembly]::LoadWithPartialName('System.IO.Compression.FileSystem')
+        Add-Type -AssemblyName System.IO.Compression.FileSystem
         [IO.Compression.ZipFile]::CreateFromDirectory($ServerRepositoryLogsPath,$Archive)
       }
       catch {
@@ -395,7 +396,7 @@ function Remove-LogFiles {
   }
   Else {
     # oops, folder does not exist or is not accessible
-    Write-Host ("The folder {0} doesn't exist or is not accessible! Check the folder path!" -f $TargetServerFolder) -ForegroundColor Red
+    Write-Warning ("The folder {0} doesn't exist or is not accessible! Check the folder path!" -f $TargetServerFolder) -ForegroundColor Red
 
     #Html output
     $Output = ("The folder {0} doesn't exist or is not accessible! Check the folder path!" -f $TargetServerFolder)
@@ -485,14 +486,16 @@ If (Test-IsAdmin) {
   Write-Output ('Removing IIS and Exchange logs - Keeping last {0} days - Be patient, it might take some time' -f $DaysToKeep)
 
   # Track script execution in Exchange Admin Audit Log 
-  Write-AdminAuditLog -Comment 'Purge-LogFiles started!'
+  if(-not $IsEdge) {
+    Write-AdminAuditLog -Comment 'Purge-LogFiles started!'
+  }
   $logger.Write(('Purge-LogFiles started, keeping last {0} days of log files.' -f ($DaysToKeep)))
     
   $AllExchangeServers = $null
 
   if($IsEdge) { 
-    # Get a list of all Exchange V15* servers
-    $AllExchangeServers = Get-ExchangeServer | Where-Object {$_.IsE15OrLater -eq $true} | Sort-Object -Property Name
+    # Just run on local server
+    $AllExchangeServers = $env:COMPUTERNAME 
   }
   else {
     # Get a list of all Exchange V15* servers, exclude server service the EDGE role
@@ -533,8 +536,10 @@ If (Test-IsAdmin) {
     <ul>' -f $E15Server)
 
     # Remove IIS log files
-    $Output += Remove-LogFiles -Path $IisUncLogPath -Type IIS
-    $i++
+    if(-not $IsEdge) {
+        $Output += Remove-LogFiles -Path $IisUncLogPath -Type IIS
+        $i++
+    }
 
     # Remove Exchange files
     $ExchangePurgeUncLogPath = $ExchangeUncLogPath
@@ -551,6 +556,10 @@ If (Test-IsAdmin) {
       Write-Verbose -Message ('Failed to get Exchange Install Path for server {0}' -f $E15Server)
     }
     $i++
+
+    # Ensure dedicated purging of ActiveMonitoringTrace logs
+    # Check \bin\MSExchangeHMWorker.exe.config settings for trace log file settings
+    $Output += Remove-LogFiles -Path $ExchangeUncActiveMonitoringLogPath -Type Exchange
 
     # Remove HttpErr files
     if($IncludeHttpErr) { 

@@ -4,7 +4,7 @@ Update to most current release if you are using _v2.1_
 
 # Purge-LogFiles.ps1
 
-PowerShell script for modern Exchange Server environments to clean up Exchange and IIS log files.
+PowerShell script for modern Exchange Server environments to clean up Exchange Server and IIS log files.
 
 ## Description
 
@@ -28,6 +28,7 @@ Currently, it is assumed that the IIS log file location is identical across all 
 
 ## Updates
 
+- 2020-05-14, v2.3.1, Issues #14, #15 fixed to properly support Edge Transport Role
 - 2020-03-12, v2.3, Option for HTTPERR added, Option for dynamic Exchange install paths added, Html formatting added, tested with Exchange Server 2019
 
 ## Parameters
@@ -42,11 +43,11 @@ Switch to use automatic detection of the IIS and Exchange log folder paths
 
 ### IsEdge
 
-Indicates the the script is executed on an Exchange Server holding the EDGE role. Without the switch servers holding the EDGE role are excluded
+Indicates the the script is executed on an Exchange Server holding the EDGE role. Without the switch servers holding the EDGE role are excluded.
 
 ### IncludeHttpErr
 
-Include the HTTPERR log files in the purge routine. Those logs are normally stored at C:\Windows\System32\LogFiles\HTTPERR
+Include the HTTPERR log files in the purge routine. Those logs are normally stored at _C:\Windows\System32\LogFiles\HTTPERR_.
 
 ### UseDynamicExchangePaths
 
@@ -118,29 +119,23 @@ Delete Exchange Server, IIS, and HTTPERR log files older than 7 days, and send a
 THIS CODE IS MADE AVAILABLE AS IS, WITHOUT WARRANTY OF ANY KIND. THE ENTIRE
 RISK OF THE USE OR THE RESULTS FROM THE USE OF THIS CODE REMAINS WITH THE USER.
 
-## TechNet Gallery
-
-Download and vote at TechNet Gallery
-
-* [https://gallery.technet.microsoft.com/Purge-Exchange-Server-2013-c2e03e72](https://gallery.technet.microsoft.com/Purge-Exchange-Server-2013-c2e03e72)
-
 ## Credits
 
 Written by: Thomas Stensitzki
 
 Stay connected:
 
-* My Blog: [http://justcantgetenough.granikos.eu](http://justcantgetenough.granikos.eu)
-* Twitter: [https://twitter.com/stensitzki](https://twitter.com/stensitzki)
-* LinkedIn:	[http://de.linkedin.com/in/thomasstensitzki](http://de.linkedin.com/in/thomasstensitzki)
-* Github: [https://github.com/Apoc70](https://github.com/Apoc70)
+- My Blog: [http://justcantgetenough.granikos.eu](http://justcantgetenough.granikos.eu)
+- Twitter: [https://twitter.com/stensitzki](https://twitter.com/stensitzki)
+- LinkedIn:	[http://de.linkedin.com/in/thomasstensitzki](http://de.linkedin.com/in/thomasstensitzki)
+- Github: [https://github.com/Apoc70](https://github.com/Apoc70)
 
 For more Office 365, Cloud Security, and Exchange Server stuff checkout services provided by Granikos
 
-* Blog: [http://blog.granikos.eu](http://blog.granikos.eu)
-* Website: [https://www.granikos.eu/en/](https://www.granikos.eu/en/)
-* Twitter: [https://twitter.com/granikos_de](https://twitter.com/granikos_de)
+- Blog: [http://blog.granikos.eu](http://blog.granikos.eu)
+- Website: [https://www.granikos.eu/en/](https://www.granikos.eu/en/)
+- Twitter: [https://twitter.com/granikos_de](https://twitter.com/granikos_de)
 
 Additional Credits:
 
-* Is-Admin function (c) by Michel de Rooij, michel@eightwone.com
+- Is-Admin function (c) by Michel de Rooij, michel@eightwone.com
