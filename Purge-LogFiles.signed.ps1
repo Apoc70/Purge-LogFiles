@@ -9,7 +9,7 @@
     THIS CODE IS MADE AVAILABLE AS IS, WITHOUT WARRANTY OF ANY KIND. THE ENTIRE 
     RISK OF THE USE OR THE RESULTS FROM THE USE OF THIS CODE REMAINS WITH THE USER.
 	
-    Version 2.3, 2020-03-05
+    Version 2.3.2, 2020-12-04
 
     Please post ideas, comments, and suggestions at GitHub.
  
@@ -66,6 +66,7 @@
     2.21    Issue #12 fixed
     2.3     Option for HTTPERR (#13) added, Option for dynamic Exchange install paths added, Html formatting added, tested with Exchange Server 2019
     2.3.1   Issues #14, #15
+    2.3.2   Issue #16 fixed
 	
     .PARAMETER DaysToKeep
     Number of days Exchange and IIS log files should be retained, default is 30 days
@@ -152,7 +153,7 @@ Param(
 ##   "C$\Program Files\Microsoft\Exchange Server\V15\Logging"
 
 ## ADJUST AS NEEDED
-[string]$IisUncLogPath = 'D$\IISLogs'
+[string]$IisUncLogPath = 'C$\inetpub\logs\LogFiles'
 [string]$ExchangeUncLogPath = 'C$\Program Files\Microsoft\Exchange Server\V15\Logging'
 [string]$ExchangeUncActiveMonitoringLogPath = 'C$\Program Files\Microsoft\Exchange Server\V15\Logging\Monitoring\Monitoring'
 [string]$HttpErrUncLogPath= 'C$\Windows\System32\LogFiles\HTTPERR'
@@ -506,11 +507,12 @@ If (Test-IsAdmin) {
 
   # Lets count the steps for a nice progress bar
   $i = 1
-  # Issue #12, Using Mesaure-Object to ensure that we have a Count property
-  $PurgeActions = 2
-  if($IncludeHttpErr) {$PurgeActions = 3}
+
+  # Issue #12, Using Measure-Object to ensure that we have a Count property
+  $PurgeActions = 3
+  if($IncludeHttpErr) {$PurgeActions = 4}
   
-  $PurgeActionsPerServer = ($AllExchangeServers | Measure-Object).Count * $PurgeActions # purgae actions to execute per server
+  $PurgeActionsPerServer = ($AllExchangeServers | Measure-Object).Count * $PurgeActions # purge actions to execute per server
 
   # Some text
   $HeaderText = '<p>'
@@ -563,8 +565,10 @@ If (Test-IsAdmin) {
 
     # Remove HttpErr files
     if($IncludeHttpErr) { 
+
       $Output += Remove-LogFiles -Path $HttpErrUncLogPath -Type Exchange
       $i++
+
     }
 
     $Output+='</ul>'
@@ -599,8 +603,8 @@ else {
 # SIG # Begin signature block
 # MIIOCwYJKoZIhvcNAQcCoIIN/DCCDfgCAQExCzAJBgUrDgMCGgUAMGkGCisGAQQB
 # gjcCAQSgWzBZMDQGCisGAQQBgjcCAR4wJgIDAQAABBAfzDtgWUsITrck0sYpfvNR
-# AgEAAgEAAgEAAgEAAgEAMCEwCQYFKw4DAhoFAAQU520TJvaXygM6ypfM1rb3GRG/
-# MV+gggtCMIIFRTCCBC2gAwIBAgIRAJu+BJioO1m8cfXg3OKTlXMwDQYJKoZIhvcN
+# AgEAAgEAAgEAAgEAAgEAMCEwCQYFKw4DAhoFAAQUcXMKyosNJRL95F7cWkCGmcLI
+# DNegggtCMIIFRTCCBC2gAwIBAgIRAJu+BJioO1m8cfXg3OKTlXMwDQYJKoZIhvcN
 # AQELBQAwfDELMAkGA1UEBhMCR0IxGzAZBgNVBAgTEkdyZWF0ZXIgTWFuY2hlc3Rl
 # cjEQMA4GA1UEBxMHU2FsZm9yZDEYMBYGA1UEChMPU2VjdGlnbyBMaW1pdGVkMSQw
 # IgYDVQQDExtTZWN0aWdvIFJTQSBDb2RlIFNpZ25pbmcgQ0EwHhcNMTkxMjMwMDAw
@@ -665,11 +669,11 @@ else {
 # ZWN0aWdvIExpbWl0ZWQxJDAiBgNVBAMTG1NlY3RpZ28gUlNBIENvZGUgU2lnbmlu
 # ZyBDQQIRAJu+BJioO1m8cfXg3OKTlXMwCQYFKw4DAhoFAKB4MBgGCisGAQQBgjcC
 # AQwxCjAIoAKAAKECgAAwGQYJKoZIhvcNAQkDMQwGCisGAQQBgjcCAQQwHAYKKwYB
-# BAGCNwIBCzEOMAwGCisGAQQBgjcCARUwIwYJKoZIhvcNAQkEMRYEFAyJW1r8apXY
-# qB6eLJxuB5nm6cZ/MA0GCSqGSIb3DQEBAQUABIIBAHokgPt3C/cBAC4IceKisdn0
-# Stx8B73tVFB3kJCdXdrmyEg62LKNhIhktekEUTLROk2EUmMGls1llsteN9j1roLC
-# pe9PSSvSYyADq2KpE/KngmXIcGF5YxWDSEbVVeMA5Nw10WHDPvOy8fl5sqXOUzwM
-# k1rHk/OPImxsT33LxVvrRkRh3jzjJMC+zfrrSS8Nq3buJN7N3Rog6Gy4GaZwSmNN
-# rT5NkllAmvsEn7HZGjqSewCYOkvo2BKbAkU18I9lY2wxTwHXLf1L5M/sn4LCOhcw
-# BzPzQiHeWZXRnTkrdD6KrKi9GaovITFoBdau6cBELzIQYwFvxPwJReq0U2b+098=
+# BAGCNwIBCzEOMAwGCisGAQQBgjcCARUwIwYJKoZIhvcNAQkEMRYEFLZFJI4emPtR
+# SwZe+9CoMOeIcQ76MA0GCSqGSIb3DQEBAQUABIIBAK46ascmpEWmwKFsMmjmotNb
+# nhrth57w7ZihdySsTocKe3C9xBP44LwbzbvoIte93ZaS8bfuQjMccFW8s5FjrmGA
+# 9uUYSZu0a76iUn+RVHDkhQlTwHoMj50LYfhCe81wrHJIqoP8cY/P2BtlrIsLpL7U
+# VubXbxP0ec++qpoangBxnCEBKULm/b6aeQQXofhLkAqqY9wK8PmpMI8uH2dWZcmy
+# skXbqy1r/hRY2bKDShToLrTIQ7Qrsfk0dJ9HYSJ6uc/wVBYK0/ydd/xy+NAKlAwt
+# KNRVU0uYKl3RihyjwMQ8J3KTiWruIcPShRhgPBukRutZAh3B/hl+fXj/uF3bs1I=
 # SIG # End signature block

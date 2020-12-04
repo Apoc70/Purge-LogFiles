@@ -9,7 +9,7 @@
     THIS CODE IS MADE AVAILABLE AS IS, WITHOUT WARRANTY OF ANY KIND. THE ENTIRE 
     RISK OF THE USE OR THE RESULTS FROM THE USE OF THIS CODE REMAINS WITH THE USER.
 	
-    Version 2.3, 2020-03-05
+    Version 2.3.2, 2020-12-04
 
     Please post ideas, comments, and suggestions at GitHub.
  
@@ -66,6 +66,7 @@
     2.21    Issue #12 fixed
     2.3     Option for HTTPERR (#13) added, Option for dynamic Exchange install paths added, Html formatting added, tested with Exchange Server 2019
     2.3.1   Issues #14, #15
+    2.3.2   Issue #16 fixed
 	
     .PARAMETER DaysToKeep
     Number of days Exchange and IIS log files should be retained, default is 30 days
@@ -152,7 +153,7 @@ Param(
 ##   "C$\Program Files\Microsoft\Exchange Server\V15\Logging"
 
 ## ADJUST AS NEEDED
-[string]$IisUncLogPath = 'D$\IISLogs'
+[string]$IisUncLogPath = 'C$\inetpub\logs\LogFiles'
 [string]$ExchangeUncLogPath = 'C$\Program Files\Microsoft\Exchange Server\V15\Logging'
 [string]$ExchangeUncActiveMonitoringLogPath = 'C$\Program Files\Microsoft\Exchange Server\V15\Logging\Monitoring\Monitoring'
 [string]$HttpErrUncLogPath= 'C$\Windows\System32\LogFiles\HTTPERR'
@@ -506,11 +507,12 @@ If (Test-IsAdmin) {
 
   # Lets count the steps for a nice progress bar
   $i = 1
-  # Issue #12, Using Mesaure-Object to ensure that we have a Count property
-  $PurgeActions = 2
-  if($IncludeHttpErr) {$PurgeActions = 3}
+
+  # Issue #12, Using Measure-Object to ensure that we have a Count property
+  $PurgeActions = 3
+  if($IncludeHttpErr) {$PurgeActions = 4}
   
-  $PurgeActionsPerServer = ($AllExchangeServers | Measure-Object).Count * $PurgeActions # purgae actions to execute per server
+  $PurgeActionsPerServer = ($AllExchangeServers | Measure-Object).Count * $PurgeActions # purge actions to execute per server
 
   # Some text
   $HeaderText = '<p>'
@@ -563,8 +565,10 @@ If (Test-IsAdmin) {
 
     # Remove HttpErr files
     if($IncludeHttpErr) { 
+
       $Output += Remove-LogFiles -Path $HttpErrUncLogPath -Type Exchange
       $i++
+
     }
 
     $Output+='</ul>'
