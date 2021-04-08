@@ -186,7 +186,16 @@ Add-PSSnapin -Name Microsoft.Exchange.Management.PowerShell.SnapIn -ErrorAction 
 Import-Module -Name ActiveDirectory
 
 # 2015-06-18: Implementation of global functions module
-Import-Module -Name GlobalFunctions
+# Import GlobalFunctions
+if($null -ne (Get-Module -Name GlobalFunctions -ListAvailable).Version) {
+  Import-Module -Name GlobalFunctions
+}
+else {
+  Write-Warning -Message 'Unable to load GlobalFunctions PowerShell module.'
+  Write-Warning -Message 'Open an administrative PowerShell session and run Import-Module GlobalFunctions'
+  Write-Warning -Message 'Please check http://bit.ly/GlobalFunctions for further instructions'
+  exit
+}
 $ScriptDir = Split-Path -Path $script:MyInvocation.MyCommand.Path
 $ScriptName = $MyInvocation.MyCommand.Name
 $logger = New-Logger -ScriptRoot $ScriptDir -ScriptName $ScriptName -LogFileRetention 14
