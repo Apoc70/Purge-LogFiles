@@ -9,7 +9,7 @@
     THIS CODE IS MADE AVAILABLE AS IS, WITHOUT WARRANTY OF ANY KIND. THE ENTIRE 
     RISK OF THE USE OR THE RESULTS FROM THE USE OF THIS CODE REMAINS WITH THE USER.
 	
-    Version 2.3.2, 2020-12-04
+    Version 2.3.3, 2021-08-31
 
     Please post ideas, comments, and suggestions at GitHub.
  
@@ -67,6 +67,7 @@
     2.3     Option for HTTPERR (#13) added, Option for dynamic Exchange install paths added, Html formatting added, tested with Exchange Server 2019
     2.3.1   Issues #14, #15
     2.3.2   Issue #16 fixed
+    2.3.3   ForegroundColor and percentComplete fixed
 	
     .PARAMETER DaysToKeep
     Number of days Exchange and IIS log files should be retained, default is 30 days
@@ -353,7 +354,10 @@ function Remove-LogFiles {
   $TargetServerFolder = ('\\{0}\{1}' -f $E15Server, $Path)
 
   # Write progress bar for current activity
-  Write-Progress -Activity ('Checking files on Server {0}' -f $E15Server) -Status ('Checking files in {0}' -f $TargetServerFolder) -PercentComplete(($i/$PurgeActionsPerServer)*100)
+  $percentComplete = ($i/$PurgeActionsPerServer)*100
+  # quick and dirty fix
+  if($percentComplete -gt 100){$percentComplete = 100}
+  Write-Progress -Activity ('Checking files on Server {0}' -f $E15Server) -Status ('Checking files in {0}' -f $TargetServerFolder) -PercentComplete($percentComplete)
 
   # Only try to delete files, if folder exists
   if (Test-Path -Path $TargetServerFolder) {
@@ -406,7 +410,7 @@ function Remove-LogFiles {
   }
   Else {
     # oops, folder does not exist or is not accessible
-    Write-Warning ("The folder {0} doesn't exist or is not accessible! Check the folder path!" -f $TargetServerFolder) -ForegroundColor Red
+    Write-Warning ("The folder {0} doesn't exist or is not accessible! Check the folder path!" -f $TargetServerFolder) 
 
     #Html output
     $Output = ("The folder {0} doesn't exist or is not accessible! Check the folder path!" -f $TargetServerFolder)
