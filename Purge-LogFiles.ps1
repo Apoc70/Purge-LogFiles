@@ -9,7 +9,7 @@
     THIS CODE IS MADE AVAILABLE AS IS, WITHOUT WARRANTY OF ANY KIND. THE ENTIRE 
     RISK OF THE USE OR THE RESULTS FROM THE USE OF THIS CODE REMAINS WITH THE USER.
 	
-    Version 2.3.3, 2021-08-31
+    Version 2.4, 2021-11-12
 
     Please post ideas, comments, and suggestions at GitHub.
  
@@ -68,6 +68,7 @@
     2.3.1   Issues #14, #15
     2.3.2   Issue #16 fixed
     2.3.3   ForegroundColor and percentComplete fixed
+    2.4     Force TLS 1.2 added
 	
     .PARAMETER DaysToKeep
     Number of days Exchange and IIS log files should be retained, default is 30 days
@@ -179,6 +180,16 @@ $ERR_NONELEVATEDMODE = 1099
 [bool]$CopyFiles = $false
 [bool]$ZipArchive = $false
 [bool]$DeleteZippedFiles = $false
+
+# Set TLS protocol to TLS 1.2
+[System.Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+ 
+# Build a Credential object containing SparkPost API key as password
+$pwd = ConvertTo-SecureString "<<MY API KEY HERE>>" -AsPlainText -Force
+$creds = New-Object System.Management.Automation.PSCredential ("SMTP_Injection", $pwd)
+ 
+Send-MailMessage -From me@mysendingdomain.com -To me@myrecipientdomain.com -Subject "Hello World" -Body "Here it is" `
+ -SmtpServer smtp.eu.sparkpostmail.com -Port 587 -Credential $creds -UseSsl
 
 # Import Exchange functions
 Add-PSSnapin -Name Microsoft.Exchange.Management.PowerShell.SnapIn -ErrorAction SilentlyContinue
