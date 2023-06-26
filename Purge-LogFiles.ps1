@@ -1,50 +1,50 @@
 <#
     .SYNOPSIS
-    Purge Exchange 2013+ and IIS log files across multiple Exchange servers 
-   
+    Purge Exchange 2013+ and IIS log files across multiple Exchange servers
+
     Thomas Stensitzki
     (Based Based on the original script by Brian Reid, C7 Solutions (c)
     http://www.c7solutions.com/2013/04/removing-old-exchange-2013-log-files-html)
-	
-    THIS CODE IS MADE AVAILABLE AS IS, WITHOUT WARRANTY OF ANY KIND. THE ENTIRE 
+
+    THIS CODE IS MADE AVAILABLE AS IS, WITHOUT WARRANTY OF ANY KIND. THE ENTIRE
     RISK OF THE USE OR THE RESULTS FROM THE USE OF THIS CODE REMAINS WITH THE USER.
-	
+
     Version 2.4, 2021-11-12
 
     Please post ideas, comments, and suggestions at GitHub.
- 
-    .LINK  
+
+    .LINK
     http://scripts.Granikos.eu
-	
+
     .DESCRIPTION
-	
+
     This script deletes all Exchange and IIS logs older than X days from all Exchange 2013+ servers
     that are fetched using the Get-ExchangeServer cmdlet.
 
-    The Exchange log file location is read from a variable and used to build an 
-    administrative UNC path for file deletions. It is assumed that the Exchange setup 
+    The Exchange log file location is read from a variable and used to build an
+    administrative UNC path for file deletions. It is assumed that the Exchange setup
     path is IDENTICAL across all Exchange servers.
-  
+
     Optionally, you can use the Active Directory
     configuration partition to determine the Exchange install path dynamically, if supported
     in your Active Directory environment.
-    
+
     The IIS log file location is read from the local IIS metabase of the LOCAL server
     and is used to build an administrative UNC path for IIS log file deletions.
 
     Currently, it is assumed that the IIS log file location is identical across all Exchange servers.
 
-    .NOTES 
-    Requirements 
+    .NOTES
+    Requirements
     - Windows Server 2012 R2 or newer
     - Utilizes the global function library found here: http://scripts.granikos.eu
     - AciveDirectory PowerShell module
     - Exchange 2013+ Management Shell
 
-    Revision History 
-    -------------------------------------------------------------------------------- 
-    1.0     Initial community release 
-    1.1     Variable fix and optional code added 
+    Revision History
+    --------------------------------------------------------------------------------
+    1.0     Initial community release
+    1.1     Variable fix and optional code added
     1.2     Auto/Manual configration options added
     1.3     Check if running in elevated mode added
     1.4     Handling of IIS default location fixed
@@ -59,7 +59,7 @@
     1.94    SendMail issue fixed (Thanks to denisvm, https://github.com/denisvm)
     2.0     Script update
     2.1     Log file archiving and archive compressions added
-    2.11    Issue #6 fixed 
+    2.11    Issue #6 fixed
     2.13    Issue #7 fixed
     2.14    Issue #9 fixed
     2.2     Minor changes, but no fixes
@@ -69,7 +69,7 @@
     2.3.2   Issue #16 fixed
     2.3.3   ForegroundColor and percentComplete fixed
     2.4     Force TLS 1.2 added
-	
+
     .PARAMETER DaysToKeep
     Number of days Exchange and IIS log files should be retained, default is 30 days
 
@@ -106,9 +106,9 @@
 
     .PARAMETER MailServer
     SMTP Server for email report
-   
+
     .EXAMPLE
-    Delete Exchange Server and IIS log files older than 14 days 
+    Delete Exchange Server and IIS log files older than 14 days
 
     .\Purge-LogFiles -DaysToKeep 14
 
@@ -120,7 +120,7 @@
     .EXAMPLE
     Delete Exchange Server and IIS log files older than 7 days with automatic discovery and send email report
 
-    .\Purge-LogFiles -DaysToKeep 7 -Auto -SendMail -MailFrom postmaster@sedna-inc.com -MailTo exchangeadmin@sedna-inc.com -MailServer mail.sedna-inc.com 
+    .\Purge-LogFiles -DaysToKeep 7 -Auto -SendMail -MailFrom postmaster@sedna-inc.com -MailTo exchangeadmin@sedna-inc.com -MailServer mail.sedna-inc.com
 
     .EXAMPLE
     Delete Exchange and IIS log files older than 14 days, but copy files to a central repository and compress the log files before final deletion
@@ -135,7 +135,7 @@
 #>
 [CmdletBinding()]
 Param(
-  [int]$DaysToKeep = 30,  
+  [int]$DaysToKeep = 30,
   [switch]$Auto,
   [switch]$IsEdge,
   [switch]$IncludeHttpErr,
@@ -149,8 +149,8 @@ Param(
   [string]$ArchiveMode = 'None'
 )
 
-## Set fixed IIS and Exchange log paths 
-## Examples: 
+## Set fixed IIS and Exchange log paths
+## Examples:
 ##   "C$\inetpub\logs\LogFiles"
 ##   "C$\Program Files\Microsoft\Exchange Server\V15\Logging"
 
@@ -183,13 +183,13 @@ $ERR_NONELEVATEDMODE = 1099
 
 # Set TLS protocol to TLS 1.2
 [System.Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
- 
+
 # Build a Credential object containing SparkPost API key as password
-$pwd = ConvertTo-SecureString "<<MY API KEY HERE>>" -AsPlainText -Force
-$creds = New-Object System.Management.Automation.PSCredential ("SMTP_Injection", $pwd)
- 
-Send-MailMessage -From me@mysendingdomain.com -To me@myrecipientdomain.com -Subject "Hello World" -Body "Here it is" `
- -SmtpServer smtp.eu.sparkpostmail.com -Port 587 -Credential $creds -UseSsl
+#$pwd = ConvertTo-SecureString "<<MY API KEY HERE>>" -AsPlainText -Force
+#$creds = New-Object System.Management.Automation.PSCredential ("SMTP_Injection", $pwd)
+
+# Send-MailMessage -From me@mysendingdomain.com -To me@myrecipientdomain.com -Subject "Hello World" -Body "Here it is" `
+#-SmtpServer smtp.eu.sparkpostmail.com -Port 587 -Credential $creds -UseSsl
 
 # Import Exchange functions
 Add-PSSnapin -Name Microsoft.Exchange.Management.PowerShell.SnapIn -ErrorAction SilentlyContinue
@@ -225,8 +225,8 @@ if($Auto) {
   [string]$IisLogPath = ((Get-WebConfigurationProperty -Filter 'system.applicationHost/sites/siteDefaults' -Name logFile).directory).Replace('%SystemDrive%',$env:SystemDrive)
 
   # Extract drive letter and build log path
-  [string]$IisUncLogDrive =$IisLogPath.Split(':\')[0] 
-  $IisUncLogPath = $IisUncLogDrive + '$\' + $IisLogPath.Remove(0,3) 
+  [string]$IisUncLogDrive =$IisLogPath.Split(':\')[0]
+  $IisUncLogPath = $IisUncLogDrive + '$\' + $IisLogPath.Remove(0,3)
 }
 
 function Get-ExchangeServerProperty {
@@ -241,13 +241,13 @@ function Get-ExchangeServerProperty {
 
   $PropertyValue = ''
 
-  if($ADForest -ne $null) {
-    $ServerExists = ((Get-Item -Path ("AD:\CN={3},CN=Servers,CN=Exchange Administrative Group (FYDIBOHF23SPDLT),CN=Administrative Groups,CN={0},CN=Microsoft Exchange,CN=Services,CN=Configuration,DC={1},DC={2}" -f (Get-OrganizationConfig).Name, $ADForest[0], $ADForest[1], $ServerName) -ErrorAction SilentlyContinue) -ne $null)
+  if($null -ne $ADForest) {
+    $ServerExists = ($null -ne (Get-Item -Path ("AD:\CN={3},CN=Servers,CN=Exchange Administrative Group (FYDIBOHF23SPDLT),CN=Administrative Groups,CN={0},CN=Microsoft Exchange,CN=Services,CN=Configuration,DC={1},DC={2}" -f (Get-OrganizationConfig).Name, $ADForest[0], $ADForest[1], $ServerName) -ErrorAction SilentlyContinue))
 
-    if($ServerExists) { 
-    
+    if($ServerExists) {
+
       Write-Verbose -Message ('Server Object {0} found in configuration partition' -f $ServerName)
-    
+
       $PropertyValue = (Get-ItemProperty -Path ("AD:\CN={3},CN=Servers,CN=Exchange Administrative Group (FYDIBOHF23SPDLT),CN=Administrative Groups,CN={0},CN=Microsoft Exchange,CN=Services,CN=Configuration,DC={1},DC={2}" -f (Get-OrganizationConfig).Name, $ADForest[0], $ADForest[1], $ServerName) -Name $PropertyName -ErrorAction SilentlyContinue).$PropertyName
 
       Write-Verbose -Message ('| Property {0} = {1}' -f $PropertyName, $PropertyValue)
@@ -286,7 +286,7 @@ function Copy-LogFiles {
     [string]$ArchivePrefix = ''
   )
 
-  if($SourceServer -ne '') { 
+  if($SourceServer -ne '') {
 
     # path per SERVER for zipped archives
     $ServerRepositoryPath = Join-Path -Path $RepositoryRootPath -ChildPath $SourceServer
@@ -309,21 +309,21 @@ function Copy-LogFiles {
 
       # target file path
       $targetFile = $File.FullName.Replace($TargetServerFolder, $ServerRepositoryLogsPath)
-      
+
       # create target directory, if not exists
       if(!(Test-Path -Path $targetDir)) {$null = mkdir -Path $targetDir}
 
       # copy file to target
       $null = Copy-Item -Path $File.FullName -Destination $targetFile -Recurse -Force -Confirm:$false -ErrorAction SilentlyContinue
 
-    }    
-    
+    }
+
     if($ZipArchive) {
       # zip copied log files
-      
+
       $Archive = Join-Path -Path $ServerRepositoryPath -ChildPath ('{0}-{1}' -f $ArchivePrefix, $ArchiveFileName)
       $logger.Write(('Zip copied files to {0}' -f $ArchiveFileName))
-      
+
       # delete archive file, if already exists
       if(Test-Path -Path $Archive) {Remove-Item -Path $Archive -Force -Confirm:$false}
 
@@ -335,7 +335,7 @@ function Copy-LogFiles {
       }
       catch {
         $ErrorMessage = $_.Exception.Message
-        $logger.Write(('Error compressing files from {0} to {1}. Error Message: {2}' -f $ServerRepositoryLogsPath, $Archive, $ErrorMessage),3)      
+        $logger.Write(('Error compressing files from {0} to {1}. Error Message: {2}' -f $ServerRepositoryLogsPath, $Archive, $ErrorMessage),3)
       }
       finally {
 
@@ -347,8 +347,8 @@ function Copy-LogFiles {
 
         }
       }
-    } 
-  }  
+    }
+  }
 }
 
 # Function to clean log files from remote servers using UNC paths
@@ -357,7 +357,7 @@ function Remove-LogFiles {
   Param(
     [Parameter(Mandatory, HelpMessage='Absolute path to log file source')]
     [string]$Path,
-    [ValidateSet('IIS','Exchange')] 
+    [ValidateSet('IIS','Exchange')]
     [string]$Type = 'IIS'
   )
 
@@ -372,7 +372,7 @@ function Remove-LogFiles {
 
   # Only try to delete files, if folder exists
   if (Test-Path -Path $TargetServerFolder) {
-        
+
     $LastWrite = (Get-Date).AddDays(-$DaysToKeep)
 
     # Select files to delete
@@ -394,15 +394,15 @@ function Remove-LogFiles {
 
         Copy-LogFiles -SourceServer $E15Server -SourcePath $TargetServerFolder -FilesToMove $Files -ArchivePrefix $Type
       }
-        
+
       # Delete the files -> The real purge
       foreach ($File in $Files) {
-          
-        $null = Remove-Item -Path $File -ErrorAction SilentlyContinue -Force 
-          
+
+        $null = Remove-Item -Path $File -ErrorAction SilentlyContinue -Force
+
         $fileCount++
       }
-      
+
       $text  = ('{0} file(s) deleted in {1}' -f $fileCount, $TargetServerFolder)
 
       $logger.Write($text)
@@ -421,7 +421,7 @@ function Remove-LogFiles {
   }
   Else {
     # oops, folder does not exist or is not accessible
-    Write-Warning ("The folder {0} doesn't exist or is not accessible! Check the folder path!" -f $TargetServerFolder) 
+    Write-Warning ("The folder {0} doesn't exist or is not accessible! Check the folder path!" -f $TargetServerFolder)
 
     #Html output
     $Output = ("The folder {0} doesn't exist or is not accessible! Check the folder path!" -f $TargetServerFolder)
@@ -443,7 +443,7 @@ Function script:Test-IsAdmin {
   }
 }
 
-# Check validity of parameters required for sending emails 
+# Check validity of parameters required for sending emails
 Function script:Test-SendMail {
   if( ($MailFrom -ne '') -and ($MailTo -ne '') -and ($MailServer -ne '') ) {
     return $true
@@ -455,7 +455,7 @@ Function script:Test-SendMail {
 
 # Main -----------------------------------------------------
 
-If ($SendMail.IsPresent) { 
+If ($SendMail.IsPresent) {
   If (-Not (Test-SendMail)) {
     Throw 'If -SendMail specified, -MailFrom, -MailTo and -MailServer must be specified as well!'
   }
@@ -485,9 +485,9 @@ $HtmlHeader = @"
 body {
   font-family: Verdana, Geneva, Arial, Helvetica, sans-serif;
 }
-h5{ 
+h5{
  font-family: Verdana, Geneva, Arial, Helvetica, sans-serif;
- clear: both; 
+ clear: both;
  font-size: 11px;
  color:000000; }
 p{
@@ -510,17 +510,17 @@ If (Test-IsAdmin) {
 
   Write-Output ('Removing IIS and Exchange logs - Keeping last {0} days - Be patient, it might take some time' -f $DaysToKeep)
 
-  # Track script execution in Exchange Admin Audit Log 
+  # Track script execution in Exchange Admin Audit Log
   if(-not $IsEdge) {
     Write-AdminAuditLog -Comment 'Purge-LogFiles started!'
   }
   $logger.Write(('Purge-LogFiles started, keeping last {0} days of log files.' -f ($DaysToKeep)))
-    
+
   $AllExchangeServers = $null
 
-  if($IsEdge) { 
+  if($IsEdge) {
     # Just run on local server
-    $AllExchangeServers = $env:COMPUTERNAME 
+    $AllExchangeServers = $env:COMPUTERNAME
   }
   else {
     # Get a list of all Exchange V15* servers, exclude server service the EDGE role
@@ -535,7 +535,7 @@ If (Test-IsAdmin) {
   # Issue #12, Using Measure-Object to ensure that we have a Count property
   $PurgeActions = 3
   if($IncludeHttpErr) {$PurgeActions = 4}
-  
+
   $PurgeActionsPerServer = ($AllExchangeServers | Measure-Object).Count * $PurgeActions # purge actions to execute per server
 
   # Some text
@@ -555,7 +555,7 @@ If (Test-IsAdmin) {
   foreach ($E15Server In $AllExchangeServers) {
 
     $E15Server = ([string]$E15Server).ToUpper()
-        
+
     Write-Verbose -Message ('Working on: {0}' -f $E15Server)
 
     $Output += ('<h5>{0}</h5>
@@ -571,7 +571,7 @@ If (Test-IsAdmin) {
     $ExchangePurgeUncLogPath = $ExchangeUncLogPath
 
     if($UseDynamicExchangePaths) {
-      $ExchangePurgeUncLogPath = Get-ExchangeServerDynamicPath -ServerName $E15Server 
+      $ExchangePurgeUncLogPath = Get-ExchangeServerDynamicPath -ServerName $E15Server
     }
 
     if($ExchangePurgeUncLogPath -ne '') {
@@ -588,7 +588,7 @@ If (Test-IsAdmin) {
     $Output += Remove-LogFiles -Path $ExchangeUncActiveMonitoringLogPath -Type Exchange
 
     # Remove HttpErr files
-    if($IncludeHttpErr) { 
+    if($IncludeHttpErr) {
 
       $Output += Remove-LogFiles -Path $HttpErrUncLogPath -Type Exchange
       $i++
@@ -606,7 +606,7 @@ If (Test-IsAdmin) {
   if($SendMail) {
     $logger.Write(('Sending email to {0}' -f $MailTo))
     try {
-      Send-Mail -From $MailFrom -To $MailTo -SmtpServer $MailServer -MessageBody $Output -Subject 'Purge-Logfiles Report'         
+      Send-Mail -From $MailFrom -To $MailTo -SmtpServer $MailServer -MessageBody $Output -Subject 'Purge-Logfiles Report'
     }
     catch {
       $logger.Write(('Error sending email to {0}' -f $MailTo),3)
