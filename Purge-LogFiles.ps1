@@ -1,6 +1,6 @@
 <#
     .SYNOPSIS
-    Purge Exchange 2013+ and IIS log files across multiple Exchange servers
+    Purge Exchange 2016+ and IIS log files across multiple Exchange servers
 
     Thomas Stensitzki
     (Based Based on the original script by Brian Reid, C7 Solutions (c)
@@ -9,12 +9,12 @@
     THIS CODE IS MADE AVAILABLE AS IS, WITHOUT WARRANTY OF ANY KIND. THE ENTIRE
     RISK OF THE USE OR THE RESULTS FROM THE USE OF THIS CODE REMAINS WITH THE USER.
 
-    Version 2.4, 2021-11-12
+    Version 2.5, 2024-06-27
 
     Please post ideas, comments, and suggestions at GitHub.
 
     .LINK
-    http://scripts.Granikos.eu
+    https://scripts.Granikos.eu
 
     .DESCRIPTION
 
@@ -36,10 +36,10 @@
 
     .NOTES
     Requirements
-    - Windows Server 2012 R2 or newer
-    - Utilizes the global function library found here: http://scripts.granikos.eu
+    - Windows Server 2019 or newer
+    - Utilizes the global function library found here: https://scripts.granikos.eu
     - AciveDirectory PowerShell module
-    - Exchange 2013+ Management Shell
+    - Exchange 2016+ Management Shell
 
     Revision History
     --------------------------------------------------------------------------------
@@ -69,6 +69,7 @@
     2.3.2   Issue #16 fixed
     2.3.3   ForegroundColor and percentComplete fixed
     2.4     Force TLS 1.2 added
+    2.5     Minor changes
 
     .PARAMETER DaysToKeep
     Number of days Exchange and IIS log files should be retained, default is 30 days
@@ -205,7 +206,7 @@ if($null -ne (Get-Module -Name GlobalFunctions -ListAvailable).Version) {
 else {
   Write-Warning -Message 'Unable to load GlobalFunctions PowerShell module.'
   Write-Warning -Message 'Open an administrative PowerShell session and run Import-Module GlobalFunctions'
-  Write-Warning -Message 'Please check http://bit.ly/GlobalFunctions for further instructions'
+  Write-Warning -Message 'Please check http://bit.ly/GlobalFunctions for further information.'
   exit
 }
 $ScriptDir = Split-Path -Path $script:MyInvocation.MyCommand.Path
@@ -373,6 +374,7 @@ function Remove-LogFiles {
   # Only try to delete files, if folder exists
   if (Test-Path -Path $TargetServerFolder) {
 
+    # Calculate date to keep
     $LastWrite = (Get-Date).AddDays(-$DaysToKeep)
 
     # Select files to delete
@@ -382,6 +384,7 @@ function Remove-LogFiles {
     # Lets count the files that will be deleted
     $fileCount = 0
 
+    # Check if we have files to delete
     if($FilesToDelete -gt 0) {
 
       if($CopyFiles) {
@@ -436,9 +439,11 @@ Function script:Test-IsAdmin {
   $currentPrincipal = New-Object -TypeName Security.Principal.WindowsPrincipal -ArgumentList ( [Security.Principal.WindowsIdentity]::GetCurrent() )
 
   If( $currentPrincipal.IsInRole( [Security.Principal.WindowsBuiltInRole]::Administrator )) {
+    # We are running in elevated mode
     return $true
   }
   else {
+    # We are not running in elevated mode
     return $false
   }
 }
