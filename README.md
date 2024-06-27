@@ -6,6 +6,10 @@ Update to most current release if you are using _v2.1_
 
 PowerShell script for modern Exchange Server environments to clean up Exchange Server and IIS log files.
 
+# Note
+
+This repository is archived. You can find the most recent release of this script [here](https://github.com/Apoc70/PowerShell-Scripts/tree/main/Exchange%20Server/Purge-LogFiles).
+
 ## Description
 
 This script deletes all Exchange Server and IIS logs older than X days from all Exchange 2013+ servers that are fetched using the Get-ExchangeServer cmdlet.
@@ -125,18 +129,16 @@ Written by: Thomas Stensitzki
 
 ## Stay connected
 
-- My Blog: [http://justcantgetenough.granikos.eu](http://justcantgetenough.granikos.eu)
-- Twitter: [https://twitter.com/stensitzki](https://twitter.com/stensitzki)
-- LinkedIn: [http://de.linkedin.com/in/thomasstensitzki](http://de.linkedin.com/in/thomasstensitzki)
-- Github: [https://github.com/Apoc70](https://github.com/Apoc70)
-- MVP Blog: [https://blogs.msmvps.com/thomastechtalk/](https://blogs.msmvps.com/thomastechtalk/)
-- Tech Talk YouTube Channel (DE): [http://techtalk.granikos.eu](http://techtalk.granikos.eu)
+- My Blog: [https://blog.granikos.eu](https://blog.granikos.eu)
+- Bluesky: [https://bsky.app/profile/stensitzki.bsky.social](https://bsky.app/profile/stensitzki.bsky.social)
+- LinkedIn: [https://www.linkedin.com/in/thomasstensitzki](https://www.linkedin.com/in/thomasstensitzki)
+- YouTube: [https://www.youtube.com/@ThomasStensitzki](https://www.youtube.com/@ThomasStensitzki)
+- LinkTree: [https://linktr.ee/stensitzki](https://linktr.ee/stensitzki)
 
 For more Office 365, Cloud Security, and Exchange Server stuff checkout services provided by Granikos
 
-- Blog: [http://blog.granikos.eu](http://blog.granikos.eu)
 - Website: [https://www.granikos.eu/en/](https://www.granikos.eu/en/)
-- Twitter: [https://twitter.com/granikos_de](https://twitter.com/granikos_de)
+- Bluesky: [https://bsky.app/profile/granikos.bsky.social](https://bsky.app/profile/granikos.bsky.social)
 
 ## Additional Credits
 
